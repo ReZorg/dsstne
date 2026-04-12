@@ -1,4 +1,4 @@
-name: Makefile CI
+name: CI
 
 on:
   push:
@@ -7,21 +7,26 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: configure
-      run: ./configure
-
     - name: Install dependencies
-      run: make
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcppunit-dev libnetcdf-dev libnetcdf-c++4-dev cmake
 
-    - name: Run check
-      run: make check
+    - name: Build unit tests
+      working-directory: tst/unittests
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make
 
-    - name: Run distcheck
-      run: make distcheck
+    - name: Run unit tests
+      working-directory: tst/unittests/build
+      run: ./unittests
