@@ -95,7 +95,7 @@ Usage: predict -d <dataset_name> -n <network_file> -r <input_text_file> -i <inpu
     -s filename (required) . to put the output recs to.
 ```
 
-If this is what you see, you're ready to move on to the [examples]. Note that before running the examples, you should start a shell on a fresh Docker container:
+If this is what you see, you're ready to move on to the [examples](examples.md). Note that before running the examples, you should start a shell on a fresh Docker container:
 
 ```bash
 nvidia-docker run -it amazon-dsstne /bin/bash
@@ -137,7 +137,7 @@ sudo dnf install atlas-devel
 ```
 
 #### OpenMPI Setup
-MPI is used across in DSTTNE to allow multi GPU modeling. OpenMPI package is used as the MPI Platform.
+MPI is used across in DSSTNE to allow multi GPU modeling. OpenMPI package is used as the MPI Platform.
 
 ```bash
 # Ubuntu/Linux 64-bit
@@ -194,7 +194,7 @@ sudo cp -rf cub-1.8.0/cub/ /usr/local/include/
 ```
 
 #### cuDNN
-Follow the instructions to intall cuDNN for your version of CUDA Toolkit [here](https://docs.nvidia.com/deeplearning/sdk/cudnn-install/index.html#download).
+Follow the instructions to install cuDNN for your version of CUDA Toolkit [here](https://docs.nvidia.com/deeplearning/sdk/cudnn-install/index.html#download).
  
 ### Build and Install
 #### Build from Source
