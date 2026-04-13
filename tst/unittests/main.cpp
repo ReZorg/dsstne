@@ -25,7 +25,8 @@ int main()
     runner.addTest(TestUtils::suite());
     runner.addTest(TestUtilsComprehensive::suite());
     runner.addTest(TestNetCDFhelperExtended::suite());
-    runner.addTest(TestNNDataSetDimensionsExtended::suite());
+    // Note: TestNNDataSetDimensionsExtended tests are in tst/amazon/dsstne/engine/
+    // and require GPU dependencies. They run as part of the GPU test suite.
     runner.addTest(TestElapsedSeconds::suite());
     runner.addTest(TestRandomUtils::suite());
     runner.addTest(TestCWMetric::suite());

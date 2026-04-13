@@ -18,102 +18,10 @@
 
 using namespace std;
 
-/**
- * Test suite for NNDataSetDimensions structure
- * Tests initialization, default values, and dimension calculations
- */
-class TestNNDataSetDimensionsExtended : public CppUnit::TestFixture
-{
-public:
-
-    // ============== Default Constructor Tests ==============
-    
-    void TestDefaultConstructorInitializesZeros() {
-        // Test that NNDataSetDimensions() sets expected default values
-        // Based on implementation, defaults should be 0 or 1
-    }
-
-    // ============== Parameterized Constructor Tests ==============
-    
-    void TestConstructorWith1DInput() {
-        // Width only - 1D input
-        // NNDataSetDimensions(128) should give dimensions = 1
-    }
-    
-    void TestConstructorWith2DInput() {
-        // Width and height - 2D input (e.g., images)
-        // NNDataSetDimensions(28, 28) should give dimensions = 2
-    }
-    
-    void TestConstructorWith3DInput() {
-        // Width, height, length - 3D input (e.g., volume data)
-        // NNDataSetDimensions(64, 64, 64) should give dimensions = 3
-    }
-    
-    void TestDimensionsCalculation() {
-        // When height=1, length=1, dimensions should be 1 (or 0)
-        // When height>1, length=1, dimensions should be 2
-        // When height>1, length>1, dimensions should be 3
-    }
-    
-    void TestWidthSetCorrectly() {
-        // Verify width is set correctly in all constructors
-    }
-    
-    void TestHeightDefaultsTo1() {
-        // When not specified, height should default to 1
-    }
-    
-    void TestLengthDefaultsTo1() {
-        // When not specified, length should default to 1
-    }
-
-    // ============== NNDataSetDescriptor Tests ==============
-    
-    void TestIsSupportedWithNoAttributes() {
-        // No attributes (dense) should be supported
-        // uint32_t attrs = 0;
-        // CPPUNIT_ASSERT(NNDataSetDescriptor::isSupported(attrs));
-    }
-    
-    void TestIsSupportedWithSparseAttribute() {
-        // Sparse attribute should be supported
-        // uint32_t attrs = NNDataSetEnums::Attributes::Sparse;
-        // CPPUNIT_ASSERT(NNDataSetDescriptor::isSupported(attrs));
-    }
-    
-    void TestIsSupportedWithUnsupportedAttribute() {
-        // Some attributes are not supported
-        // This should return false
-    }
-    
-    void TestIsSupportedWithMultipleAttributes() {
-        // Multiple supported attributes should still be supported
-    }
-
-    // ============== CPPUNIT Test Suite Registration ==============
-    
-    CPPUNIT_TEST_SUITE(TestNNDataSetDimensionsExtended);
-    
-    // Note: These tests are placeholders that demonstrate test structure
-    // Actual implementation depends on NNDataSetDimensions being available
-    // without GPU dependencies (compilation may fail if GpuTypes.h requires CUDA)
-    
-    CPPUNIT_TEST(TestDefaultConstructorInitializesZeros);
-    CPPUNIT_TEST(TestConstructorWith1DInput);
-    CPPUNIT_TEST(TestConstructorWith2DInput);
-    CPPUNIT_TEST(TestConstructorWith3DInput);
-    CPPUNIT_TEST(TestDimensionsCalculation);
-    CPPUNIT_TEST(TestWidthSetCorrectly);
-    CPPUNIT_TEST(TestHeightDefaultsTo1);
-    CPPUNIT_TEST(TestLengthDefaultsTo1);
-    CPPUNIT_TEST(TestIsSupportedWithNoAttributes);
-    CPPUNIT_TEST(TestIsSupportedWithSparseAttribute);
-    CPPUNIT_TEST(TestIsSupportedWithUnsupportedAttribute);
-    CPPUNIT_TEST(TestIsSupportedWithMultipleAttributes);
-    
-    CPPUNIT_TEST_SUITE_END();
-};
+// NOTE: NNDataSetDimensions and NNDataSetDescriptor tests require GPU dependencies
+// (NNTypes.h includes GpuTypes.h which requires CUDA).
+// These tests are implemented in tst/amazon/dsstne/engine/ and run as part of the
+// GPU test suite. See TestNNDataSetDimensions.cpp and TestNNDataSet.cpp.
 
 /**
  * Test suite for elapsed_seconds utility function
