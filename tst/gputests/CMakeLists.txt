@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.2)
 
-project (amazon-dsstne)
+project (amazon-dsstne-gputests)
 
 ################################################################################
 #
@@ -29,6 +29,7 @@ find_package(PkgConfig)
 PKG_CHECK_MODULES(CPPUNIT REQUIRED cppunit)
 PKG_CHECK_MODULES(NETCDF REQUIRED netcdf)
 PKG_CHECK_MODULES(NETCDF_CXX4 REQUIRED netcdf-cxx4)
+PKG_CHECK_MODULES(JSONCPP REQUIRED jsoncpp)
 
 ################################################################################
 #
@@ -57,18 +58,27 @@ include_directories(
     ${MPI_CXX_INCLUDE_PATH}
     ${NETCDF_INCLUDE_DIR}
     ${NETCDF_CXX4_INCLUDE_DIR}
+    ${JSONCPP_INCLUDE_DIRS}
 )
 
+# Core engine sources for neural network functionality
 set(ENGINE_SOURCES
     ${ENGINE_DIR}/GpuTypes.cpp
+    ${ENGINE_DIR}/NNTypes.cpp
+    ${ENGINE_DIR}/NNLayer.cpp
+    ${ENGINE_DIR}/NNNetwork.cpp
+    ${ENGINE_DIR}/NNWeight.cpp
     ${ENGINE_DIR}/kernels.cu
     ${ENGINE_DIR}/kActivation.cu
     ${ENGINE_DIR}/kDelta.cu
     ${ENGINE_DIR}/kLoss.cu
 )
 
+# Utility sources
 set(UTILS_SOURCES
     ${UTILS_DIR}/Utils.cpp
+    ${UTILS_DIR}/NetCDFhelper.cpp
+    ${UTILS_DIR}/cdl.cpp
 )
 
 set(TEST_SOURCES
@@ -89,4 +99,7 @@ target_link_libraries(gputests
     ${MPI_CXX_LIBRARIES}
     ${NETCDF_LIBRARIES}
     ${NETCDF_CXX4_LIBRARIES}
+    ${JSONCPP_LIBRARIES}
+    cudnn
+    cblas
 )
