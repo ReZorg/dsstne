@@ -17,7 +17,7 @@ Category: Layer Type
     Convolutional
     Pooling
 
-Category: Layer attributes
+Category: Layer Attributes
     None
     Sparse
     Denoising
