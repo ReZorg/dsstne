@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/home/runner/work/dsstne/dsstne/tst/unittests/../../src/amazon/dsstne/engine -I/home/runner/work/dsstne/dsstne/tst/unittests/../../src/amazon/dsstne/utils
 
-CXX_FLAGS =  -std=c++11
+CXX_FLAGS =  -std=c++11 -g
 
