@@ -1,5 +1,32 @@
 Command Definition Language (Rev 0.1):
 
+Generalized CDL catalog (categories and known types):
+
+Category: Command
+    Train
+    Predict
+    Validate
+
+Category: TrainingParameters.Optimizer
+    SGD
+    Momentum
+    AdaGrad
+    Nesterov
+    RMSProp
+    AdaDelta
+    Adam
+
+Category: Parameter blocks
+    TrainingParameters
+    PredictionParameters
+
+Category: Data source declaration
+    Data
+
+Implementation Notes:
+    The CDL JSON parser currently accepts SGD and Nesterov for TrainingParameters.Optimizer.
+    The remaining optimizer modes are available when TrainingMode is selected programmatically.
+
 TrainingParameters - only used if Command is Train
 PredictionParameters - only used if Command is Predict
 

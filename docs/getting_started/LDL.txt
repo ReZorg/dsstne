@@ -1,5 +1,72 @@
 Neural network Layer Definition Language (Rev 0.8):
 
+Generalized LDL catalog (categories and known types):
+
+Category: Network Kind
+    FeedForward
+    AutoEncoder
+
+Category: Layer Kind
+    Input
+    Hidden
+    Output
+    Target
+
+Category: Layer Type
+    FullyConnected
+    Convolutional
+    Pooling
+
+Category: Layer Attributes
+    None
+    Sparse
+    Denoising
+    BatchNormalization
+
+Category: Activation
+    Sigmoid
+    Tanh
+    RectifiedLinear
+    Linear
+    ParametricRectifiedLinear
+    SoftPlus
+    SoftSign
+    SoftMax
+    RELUMax
+    LinearMax
+    ExponentialLinear
+    LeakyRectifiedLinear
+    ScaledExponentialLinear
+
+Category: WeightInit.Scheme
+    Xavier
+    CaffeXavier
+    Gaussian
+    Uniform
+    UnitBall
+    Constant
+    SELU
+
+Category: ErrorFunction
+    L1
+    L2
+    CrossEntropy
+    ScaledMarginalCrossEntropy
+    DataScaledMarginalCrossEntropy
+    Hinge
+    L2Hinge
+
+Category: Pooling function
+    None
+    Max
+    Average
+    LocalResponseNormalization
+    Maxout
+    DotProduct
+    Cosine
+    Stochastic
+    LocalContrastNormalization
+    GlobalTemporal
 {
     "Version"           : <String>                      # Indicates version (by default uses latest)
     "Name"              : <String>                      # Optional name for network
@@ -149,4 +216,3 @@ Neural network Layer Definition Language (Rev 0.8):
 
     "ErrorFunction" : <String>                          # Either SMCE, L1, L2, or CrossEntropy (default)
 }
-
