@@ -6,6 +6,7 @@
 // Test files
 #include "TestNetCDFhelper.cpp"
 #include "TestUtils.cpp"
+#include "TestCDLParser.cpp"
 
 //
 // In order to write a new test case, create a Test<File>.cpp and write the
@@ -20,5 +21,6 @@ int main()
     CppUnit::TextUi::TestRunner runner;
     runner.addTest(TestNetCDFhelper::suite());
     runner.addTest(TestUtils::suite());
+    runner.addTest(TestCDLParser::suite());
     return runner.run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }

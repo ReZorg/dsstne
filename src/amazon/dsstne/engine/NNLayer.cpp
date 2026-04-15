@@ -1676,6 +1676,26 @@ void NNLayer::CalculateActivation(uint32_t batch)
             kCalculateSoftMaxActivation(GetUnitBuffer(), batch, _localStride);
             break;
 
+        case ParametricRectifiedLinear:
+            kCalculateLRELUActivation(GetUnitBuffer(), size, _RELUSlope);
+            break;
+
+        case SoftPlus:
+            kCalculateSoftPlusActivation(GetUnitBuffer(), size);
+            break;
+
+        case SoftSign:
+            kCalculateSoftSignActivation(GetUnitBuffer(), size);
+            break;
+
+        case RELUMax:
+            kCalculateRELUMaxActivation(GetUnitBuffer(), size);
+            break;
+
+        case LinearMax:
+            // Linear activation – f(x) = x, no transformation needed.
+            break;
+
         // Stub for no activation needed
         case Linear:
             break;

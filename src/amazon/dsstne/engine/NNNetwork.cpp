@@ -3388,6 +3388,12 @@ NNNetwork* LoadNeuralNetworkJSON(const string& fname, const uint32_t batch, cons
                                             ldl._poolingFunction = PoolingFunction::Average;
                                         else if ((s.compare("lrn") == 0) || (s.compare("localresponsenormalization") == 0))
                                             ldl._poolingFunction = PoolingFunction::LRN;
+                                        else if (s.compare("stochastic") == 0)
+                                            ldl._poolingFunction = PoolingFunction::Stochastic;
+                                        else if ((s.compare("localcontrastnormalization") == 0) || (s.compare("lcn") == 0))
+                                            ldl._poolingFunction = PoolingFunction::LCN;
+                                        else if (s.compare("globaltemporal") == 0)
+                                            ldl._poolingFunction = PoolingFunction::GlobalTemporal;
                                         else
                                         {
                                             printf("LoadNeuralNetworkJSON: Invalid pooling function (%s) for pooling layer %s\n", lvalue.asString().c_str(), ldl._name.c_str());

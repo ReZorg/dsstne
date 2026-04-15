@@ -462,6 +462,360 @@ kCalculateSoftMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t 
     }
 }
 
+
+// New activation output delta kernel templates (non-indexed and indexed)
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateSoftPlusOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x;
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * ((NNFloat)1.0 - expf(-a));
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateSoftSignOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x;
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        NNFloat d = (NNFloat)1.0 - fabsf(a);
+        pDelta[uOffset + pos] = w * (a - t) * d * d;
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateRELUMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x;
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * (a > (NNFloat)0.0);
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateLinearMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x;
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t);
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateParametricRectifiedLinearOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight, NNFloat slope)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x;
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * ((a > (NNFloat)0.0) + (a <= (NNFloat)0.0) * slope);
+    }
+}
+
+// Indexed variants
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateIndexedSoftPlusOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, uint32_t* pIndex, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = pIndex[cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x];
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * ((NNFloat)1.0 - expf(-a));
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateIndexedSoftSignOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, uint32_t* pIndex, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = pIndex[cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x];
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        NNFloat d = (NNFloat)1.0 - fabsf(a);
+        pDelta[uOffset + pos] = w * (a - t) * d * d;
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateIndexedRELUMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, uint32_t* pIndex, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = pIndex[cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x];
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * (a > (NNFloat)0.0);
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateIndexedLinearMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, uint32_t* pIndex, T* pData, NNFloat* pDataWeight)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = pIndex[cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x];
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t);
+    }
+}
+
+template<typename T>
+__global__ void LAUNCH_BOUNDS()
+kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride,
+    NNFloat* pUnit, NNFloat* pDelta, uint32_t* pIndex, T* pData, NNFloat* pDataWeight, NNFloat slope)
+{
+    uint64_t pos = (blockIdx.y * blockDim.x) + threadIdx.x;
+    if (pos < stride) {
+        uint64_t uOffset = blockIdx.x * stride;
+        uint64_t dpos = pIndex[cData._bShuffleIndices ? cData._pShuffleIndex[position + blockIdx.x] : position + blockIdx.x];
+        uint64_t dOffset = dpos * stride;
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        NNFloat a = pUnit[uOffset + pos];
+        NNFloat t = pData[dOffset + pos];
+        pDelta[uOffset + pos] = w * (a - t) * ((a > (NNFloat)0.0) + (a <= (NNFloat)0.0) * slope);
+    }
+}
+
+// Sparse output delta kernel pairs
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseRawSoftPlusOutputDelta_kernel(uint32_t position, NNFloat* pDataWeight, uint32_t stride, uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    uint64_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (pos < size) {
+        NNFloat w = (NNFloat)1.0;
+        if (pDataWeight != NULL) {
+            uint64_t dpos = (pos / stride) + position;
+            dpos = cData._bShuffleIndices ? cData._pShuffleIndex[dpos] : dpos;
+            w *= pDataWeight[dpos];
+        }
+        NNFloat a = pUnit[pos];
+        pDelta[pos] = w * a * ((NNFloat)1.0 - expf(-a));
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseNonZeroSoftPlusOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, uint64_t* pSparseStart, uint64_t* pSparseEnd, uint32_t* pSparseIndex, NNFloat* pDataWeight)
+{
+    uint64_t pos = ((blockIdx.x * blockDim.x) + threadIdx.x) / cData._warpSize;
+    if (pos < batch) {
+        uint32_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + pos] : position + pos;
+        uint64_t pos1 = pSparseStart[dpos] + (threadIdx.x & cData._warpMask);
+        uint64_t end = pSparseEnd[dpos];
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        uint64_t offset = pos * stride;
+        while (pos1 < end) {
+            uint64_t pos2 = offset + pSparseIndex[pos1];
+            NNFloat a = pUnit[pos2];
+            pDelta[pos2] = w * (a - (NNFloat)1.0) * ((NNFloat)1.0 - expf(-a));
+            pos1 += cData._warpSize;
+        }
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseRawSoftSignOutputDelta_kernel(uint32_t position, NNFloat* pDataWeight, uint32_t stride, uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    uint64_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (pos < size) {
+        NNFloat w = (NNFloat)1.0;
+        if (pDataWeight != NULL) {
+            uint64_t dpos = (pos / stride) + position;
+            dpos = cData._bShuffleIndices ? cData._pShuffleIndex[dpos] : dpos;
+            w *= pDataWeight[dpos];
+        }
+        NNFloat a = pUnit[pos];
+        NNFloat d = (NNFloat)1.0 - fabsf(a);
+        pDelta[pos] = w * a * d * d;
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseNonZeroSoftSignOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, uint64_t* pSparseStart, uint64_t* pSparseEnd, uint32_t* pSparseIndex, NNFloat* pDataWeight)
+{
+    uint64_t pos = ((blockIdx.x * blockDim.x) + threadIdx.x) / cData._warpSize;
+    if (pos < batch) {
+        uint32_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + pos] : position + pos;
+        uint64_t pos1 = pSparseStart[dpos] + (threadIdx.x & cData._warpMask);
+        uint64_t end = pSparseEnd[dpos];
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        uint64_t offset = pos * stride;
+        while (pos1 < end) {
+            uint64_t pos2 = offset + pSparseIndex[pos1];
+            NNFloat a = pUnit[pos2];
+            NNFloat d = (NNFloat)1.0 - fabsf(a);
+            pDelta[pos2] = w * (a - (NNFloat)1.0) * d * d;
+            pos1 += cData._warpSize;
+        }
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseRawRELUMaxOutputDelta_kernel(uint32_t position, NNFloat* pDataWeight, uint32_t stride, uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    uint64_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (pos < size) {
+        NNFloat w = (NNFloat)1.0;
+        if (pDataWeight != NULL) {
+            uint64_t dpos = (pos / stride) + position;
+            dpos = cData._bShuffleIndices ? cData._pShuffleIndex[dpos] : dpos;
+            w *= pDataWeight[dpos];
+        }
+        NNFloat a = pUnit[pos];
+        pDelta[pos] = w * a * (a > (NNFloat)0.0);
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseNonZeroRELUMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, uint64_t* pSparseStart, uint64_t* pSparseEnd, uint32_t* pSparseIndex, NNFloat* pDataWeight)
+{
+    uint64_t pos = ((blockIdx.x * blockDim.x) + threadIdx.x) / cData._warpSize;
+    if (pos < batch) {
+        uint32_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + pos] : position + pos;
+        uint64_t pos1 = pSparseStart[dpos] + (threadIdx.x & cData._warpMask);
+        uint64_t end = pSparseEnd[dpos];
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        uint64_t offset = pos * stride;
+        while (pos1 < end) {
+            uint64_t pos2 = offset + pSparseIndex[pos1];
+            NNFloat a = pUnit[pos2];
+            pDelta[pos2] = w * (a - (NNFloat)1.0) * (a > (NNFloat)0.0);
+            pos1 += cData._warpSize;
+        }
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseRawLinearMaxOutputDelta_kernel(uint32_t position, NNFloat* pDataWeight, uint32_t stride, uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    uint64_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (pos < size) {
+        NNFloat w = (NNFloat)1.0;
+        if (pDataWeight != NULL) {
+            uint64_t dpos = (pos / stride) + position;
+            dpos = cData._bShuffleIndices ? cData._pShuffleIndex[dpos] : dpos;
+            w *= pDataWeight[dpos];
+        }
+        pDelta[pos] = w * pUnit[pos];
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseNonZeroLinearMaxOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, uint64_t* pSparseStart, uint64_t* pSparseEnd, uint32_t* pSparseIndex, NNFloat* pDataWeight)
+{
+    uint64_t pos = ((blockIdx.x * blockDim.x) + threadIdx.x) / cData._warpSize;
+    if (pos < batch) {
+        uint32_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + pos] : position + pos;
+        uint64_t pos1 = pSparseStart[dpos] + (threadIdx.x & cData._warpMask);
+        uint64_t end = pSparseEnd[dpos];
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        uint64_t offset = pos * stride;
+        while (pos1 < end) {
+            uint64_t pos2 = offset + pSparseIndex[pos1];
+            NNFloat a = pUnit[pos2];
+            pDelta[pos2] = w * (a - (NNFloat)1.0);
+            pos1 += cData._warpSize;
+        }
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel(uint32_t position, NNFloat* pDataWeight, uint32_t stride, uint64_t size, NNFloat* pUnit, NNFloat* pDelta, NNFloat slope)
+{
+    uint64_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (pos < size) {
+        NNFloat w = (NNFloat)1.0;
+        if (pDataWeight != NULL) {
+            uint64_t dpos = (pos / stride) + position;
+            dpos = cData._bShuffleIndices ? cData._pShuffleIndex[dpos] : dpos;
+            w *= pDataWeight[dpos];
+        }
+        NNFloat a = pUnit[pos];
+        pDelta[pos] = w * a * ((a > (NNFloat)0.0) + (a <= (NNFloat)0.0) * slope);
+    }
+}
+
+__global__ void LAUNCH_BOUNDS()
+kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel(uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, uint64_t* pSparseStart, uint64_t* pSparseEnd, uint32_t* pSparseIndex, NNFloat* pDataWeight, NNFloat slope)
+{
+    uint64_t pos = ((blockIdx.x * blockDim.x) + threadIdx.x) / cData._warpSize;
+    if (pos < batch) {
+        uint32_t dpos = cData._bShuffleIndices ? cData._pShuffleIndex[position + pos] : position + pos;
+        uint64_t pos1 = pSparseStart[dpos] + (threadIdx.x & cData._warpMask);
+        uint64_t end = pSparseEnd[dpos];
+        NNFloat w = (pDataWeight != NULL) ? pDataWeight[dpos] : (NNFloat)1.0;
+        uint64_t offset = pos * stride;
+        while (pos1 < end) {
+            uint64_t pos2 = offset + pSparseIndex[pos1];
+            NNFloat a = pUnit[pos2];
+            pDelta[pos2] = w * (a - (NNFloat)1.0) * ((a > (NNFloat)0.0) + (a <= (NNFloat)0.0) * slope);
+            pos1 += cData._warpSize;
+        }
+    }
+}
+
+
 template<typename T> void kCalculateOutputDelta(Activation activation, uint32_t position, uint32_t batch, uint32_t stride, NNFloat* pUnit, NNFloat* pDelta, T* pData, NNFloat* pDataWeight, NNFloat slope, NNFloat alpha, NNFloat lambda)
 {
     dim3 grid(batch, (stride + getGpu()._threadsPerBlock - 1) / getGpu()._threadsPerBlock);
@@ -505,7 +859,31 @@ template<typename T> void kCalculateOutputDelta(Activation activation, uint32_t 
        case SoftMax:
             kCalculateSoftMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
             LAUNCHERROR("kCalculateSoftMaxOutputDelta_kernel");
-            break;                
+            break;
+        case SoftPlus:
+            kCalculateSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -984,7 +1362,31 @@ template<typename T> void kCalculateIndexedOutputDelta(Activation activation, ui
        case SoftMax:
             kCalculateIndexedSoftMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
             LAUNCHERROR("kCalculateIndexedSoftMaxOutputDelta_kernel");
-            break;                
+            break;
+        case SoftPlus:
+            kCalculateIndexedSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateIndexedSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateIndexedRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateIndexedLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -1511,7 +1913,31 @@ template<typename T> void kCalculateL2HingeOutputDelta(Activation activation, ui
        case SoftMax:
             kCalculateSoftMaxL2HingeOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
             LAUNCHERROR("kCalculateSoftMaxL2HingeOutputDelta_kernel");
-            break;                
+            break;
+        case SoftPlus:
+            kCalculateSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -2038,7 +2464,31 @@ template<typename T> void kCalculateIndexedL2HingeOutputDelta(Activation activat
        case SoftMax:
             kCalculateIndexedSoftMaxL2HingeOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
             LAUNCHERROR("kCalculateIndexedSoftMaxL2HingeOutputDelta_kernel");
-            break;                
+            break;
+        case SoftPlus:
+            kCalculateIndexedSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateIndexedSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateIndexedRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateIndexedLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -2613,7 +3063,51 @@ void kCalculateSparseOutputDelta(Activation activation, uint32_t position, uint3
             }
             kCalculateSparseNonZeroSoftMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
             LAUNCHERROR("kCalculateSparseNonZeroSoftMaxOutputDelta_kernel");
-            break;                        
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -2886,7 +3380,51 @@ void kCalculateIndexedSparseOutputDelta(Activation activation, uint32_t position
             }
             kCalculateIndexedSparseNonZeroSoftMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
             LAUNCHERROR("kCalculateIndexedSparseNonZeroSoftMaxOutputDelta_kernel");
-            break;                        
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -3559,7 +4097,51 @@ void kCalculateSparseAnalogOutputDelta(Activation activation, uint32_t position,
             }
             kCalculateSparseAnalogNonZeroSoftMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, pSparseData);
             LAUNCHERROR("kCalculateSparseAnalogNonZeroSoftMaxOutputDelta_kernel");
-            break;         
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -4232,7 +4814,51 @@ void kCalculateIndexedSparseAnalogOutputDelta(Activation activation, uint32_t po
             }
             kCalculateIndexedSparseAnalogNonZeroSoftMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, pSparseData);
             LAUNCHERROR("kCalculateIndexedSparseAnalogNonZeroSoftMaxOutputDelta_kernel");
-            break;         
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -4668,7 +5294,51 @@ void kCalculateSparseL2HingeOutputDelta(Activation activation, uint32_t position
             }
             kCalculateSparseNonZeroSoftMaxL2HingeOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
             LAUNCHERROR("kCalculateSparseNonZeroSoftMaxL2HingeOutputDelta_kernel");
-            break;                        
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -4949,7 +5619,51 @@ void kCalculateIndexedSparseL2HingeOutputDelta(Activation activation, uint32_t p
             }
             kCalculateIndexedSparseNonZeroSoftMaxL2HingeOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
             LAUNCHERROR("kCalculateIndexedSparseNonZeroSoftMaxL2HingeOutputDelta_kernel");
-            break;                        
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -6391,7 +7105,51 @@ void kCalculateIndexedSparseAnalogL2HingeOutputDelta(Activation activation, uint
             }
             kCalculateIndexedSparseAnalogNonZeroSoftMaxL2HingeOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, pSparseData);
             LAUNCHERROR("kCalculateIndexedSparseAnalogNonZeroSoftMaxL2HingeOutputDelta_kernel");
-            break;         
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -7937,7 +8695,31 @@ template<typename T> void kCalculateL1OutputDelta(Activation activation, uint32_
         case ScaledExponentialLinear:
             kCalculateSELUL1OutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight, alpha, lambda);
             LAUNCHERROR("kCalculateSELUL1OutputDelta_kernel");
-            break;   
+            break;
+        case SoftPlus:
+            kCalculateSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight);
+            LAUNCHERROR("kCalculateLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -8359,7 +9141,31 @@ template<typename T> void kCalculateIndexedL1OutputDelta(Activation activation, 
         case ScaledExponentialLinear:
             kCalculateIndexedSELUL1OutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight, alpha, lambda);
             LAUNCHERROR("kCalculateIndexedSELUL1OutputDelta_kernel");
-            break;   
+            break;
+        case SoftPlus:
+            kCalculateIndexedSoftPlusOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateIndexedSoftSignOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateIndexedRELUMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            kCalculateIndexedLinearMaxOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight);
+            LAUNCHERROR("kCalculateIndexedLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel<<<grid, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pData, pDataWeight, slope);
+            LAUNCHERROR("kCalculateIndexedParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -8732,7 +9538,51 @@ void kCalculateSparseL1OutputDelta(Activation activation, uint32_t position, uin
             }
             kCalculateSparseNonZeroSELUL1OutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, alpha, lambda);
             LAUNCHERROR("kCalculateSparseNonZeroSELUL1OutputDelta_kernel");
-            break;            
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -8972,7 +9822,51 @@ void kCalculateIndexedSparseL1OutputDelta(Activation activation, uint32_t positi
             }
             kCalculateIndexedSparseNonZeroSELUL1OutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pIndex, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, alpha, lambda);
             LAUNCHERROR("kCalculateIndexedSparseNonZeroSELUL1OutputDelta_kernel");
-            break;            
+            break;
+        case SoftPlus:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftPlusOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftPlusOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftPlusOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftPlusOutputDelta_kernel");
+            break;
+
+        case SoftSign:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawSoftSignOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawSoftSignOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroSoftSignOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroSoftSignOutputDelta_kernel");
+            break;
+
+        case RELUMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawRELUMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawRELUMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroRELUMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroRELUMaxOutputDelta_kernel");
+            break;
+
+        case LinearMax:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawLinearMaxOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta);
+                LAUNCHERROR("kCalculateSparseRawLinearMaxOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroLinearMaxOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight);
+            LAUNCHERROR("kCalculateSparseNonZeroLinearMaxOutputDelta_kernel");
+            break;
+
+        case ParametricRectifiedLinear:
+            if (!bSparseIgnoreZero) {
+                kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel<<<grid1, getGpu()._threadsPerBlock>>>(position, pDataWeight, stride, size, pUnit, pDelta, slope);
+                LAUNCHERROR("kCalculateSparseRawParametricRectifiedLinearOutputDelta_kernel");
+            }
+            kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel<<<grid2, getGpu()._threadsPerBlock>>>(position, batch, stride, pUnit, pDelta, pSparseStart, pSparseEnd, pSparseIndex, pDataWeight, slope);
+            LAUNCHERROR("kCalculateSparseNonZeroParametricRectifiedLinearOutputDelta_kernel");
+            break;
     }
 }
 
@@ -9107,6 +10001,39 @@ kCalculateSELUHadamardProduct_kernel(uint64_t size, NNFloat* pUnit, NNFloat* pDe
     }
 }
 
+__global__ void
+LAUNCH_BOUNDS()
+kCalculateSoftPlusHadamardProduct_kernel(uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    // f'(x) = sigmoid(x) = 1 - exp(-a) where a = softplus(x) = log(1+exp(x))
+    uint64_t pos                = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos < size)
+        pDelta[pos]            *= ((NNFloat)1.0 - expf(-pUnit[pos]));
+}
+
+__global__ void
+LAUNCH_BOUNDS()
+kCalculateSoftSignHadamardProduct_kernel(uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    // f'(x) = 1/(1+|x|)^2 = (1-|a|)^2 where a = softsign(x)
+    uint64_t pos                = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos < size)
+    {
+        NNFloat d               = (NNFloat)1.0 - fabsf(pUnit[pos]);
+        pDelta[pos]            *= d * d;
+    }
+}
+
+__global__ void
+LAUNCH_BOUNDS()
+kCalculateRELUMaxHadamardProduct_kernel(uint64_t size, NNFloat* pUnit, NNFloat* pDelta)
+{
+    // RELUMax derivative = 1 if a > 0, else 0
+    uint64_t pos                = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos < size)
+        pDelta[pos]            *= (pUnit[pos] > (NNFloat)0.0);
+}
+
 void kCalculateHadamardProduct(Activation activation, uint64_t size, NNFloat scale, NNFloat* pUnit, NNFloat* pDelta, NNFloat slope, NNFloat alpha, NNFloat lambda)
 {
     uint32_t blocks             = CalculateBlocks(size);
@@ -9146,7 +10073,31 @@ void kCalculateHadamardProduct(Activation activation, uint64_t size, NNFloat sca
         case ScaledExponentialLinear:
             kCalculateSELUHadamardProduct_kernel<<<blocks, getGpu()._threadsPerBlock>>>(size, pUnit, pDelta, alpha, lambda);
             LAUNCHERROR("kCalculateSELUHadamardProduct_kernel");
-            break;               
+            break;
+
+        case ParametricRectifiedLinear:
+            kCalculateLRELUHadamardProduct_kernel<<<blocks, getGpu()._threadsPerBlock>>>(size, pUnit, pDelta, slope);
+            LAUNCHERROR("kCalculateLRELUHadamardProduct_kernel");
+            break;
+
+        case SoftPlus:
+            kCalculateSoftPlusHadamardProduct_kernel<<<blocks, getGpu()._threadsPerBlock>>>(size, pUnit, pDelta);
+            LAUNCHERROR("kCalculateSoftPlusHadamardProduct_kernel");
+            break;
+
+        case SoftSign:
+            kCalculateSoftSignHadamardProduct_kernel<<<blocks, getGpu()._threadsPerBlock>>>(size, pUnit, pDelta);
+            LAUNCHERROR("kCalculateSoftSignHadamardProduct_kernel");
+            break;
+
+        case RELUMax:
+            kCalculateRELUMaxHadamardProduct_kernel<<<blocks, getGpu()._threadsPerBlock>>>(size, pUnit, pDelta);
+            LAUNCHERROR("kCalculateRELUMaxHadamardProduct_kernel");
+            break;
+
+        case LinearMax:
+            // Linear derivative = 1, no transformation needed
+            break;
     }
 }
 

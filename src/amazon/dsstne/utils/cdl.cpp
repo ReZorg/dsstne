@@ -4,7 +4,12 @@
 
 static std::map<string, TrainingMode> sOptimizationMap = {
     {"sgd",         TrainingMode::SGD},
-    {"nesterov",    TrainingMode::Nesterov}
+    {"momentum",    TrainingMode::Momentum},
+    {"adagrad",     TrainingMode::AdaGrad},
+    {"nesterov",    TrainingMode::Nesterov},
+    {"rmsprop",     TrainingMode::RMSProp},
+    {"adadelta",    TrainingMode::AdaDelta},
+    {"adam",        TrainingMode::Adam},
 };
 
 

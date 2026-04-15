@@ -212,6 +212,9 @@ void kCalculateELUActivation(NNFloat* pData, uint64_t size, NNFloat alpha);
 void kCalculateSELUActivation(NNFloat* pData, uint64_t size, NNFloat alpha, NNFloat lambda);
 void kCalculateLRELUActivation(NNFloat* pData, uint64_t size, NNFloat slope);
 void kCalculateSoftMaxActivation(NNFloat* pData, uint32_t batch, uint32_t stride);
+void kCalculateSoftPlusActivation(NNFloat* pData, uint64_t size);
+void kCalculateSoftSignActivation(NNFloat* pData, uint64_t size);
+void kCalculateRELUMaxActivation(NNFloat* pData, uint64_t size);
 
 // SGD/Momentum/AdaGrad/Nesterov weight update kernels
 void kSGDUpdateWeights(NNFloat alpha, NNFloat lambda, NNFloat lambda1, uint64_t size, NNFloat* pWeightGradient, NNFloat* pWeight);

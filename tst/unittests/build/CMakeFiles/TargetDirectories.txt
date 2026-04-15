@@ -1,0 +1,3 @@
+/home/runner/work/dsstne/dsstne/tst/unittests/build/CMakeFiles/unittests.dir
+/home/runner/work/dsstne/dsstne/tst/unittests/build/CMakeFiles/edit_cache.dir
+/home/runner/work/dsstne/dsstne/tst/unittests/build/CMakeFiles/rebuild_cache.dir

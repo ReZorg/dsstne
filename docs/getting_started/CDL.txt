@@ -24,8 +24,8 @@ Category: Data source declaration
     Data
 
 Implementation Notes:
-    The CDL JSON parser currently accepts SGD and Nesterov for TrainingParameters.Optimizer.
-    The remaining optimizer modes are available when TrainingMode is selected programmatically.
+    All 7 optimizer modes are now available via the CDL JSON parser for
+    TrainingParameters.Optimizer: SGD, Momentum, AdaGrad, Nesterov, RMSProp, AdaDelta, Adam.
 
 TrainingParameters - only used if Command is Train
 PredictionParameters - only used if Command is Predict
@@ -48,7 +48,7 @@ PredictionParameters - only used if Command is Predict
         "mu" : <float>                      # Momentum update parameter (default 0.9)
         "AlphaInterval" : <float>           # Interval between learning rate updates (default 0: constant)
         "AlphaMultiplier" : <float>         # Learning rate multiplier per Interval (default: 0.5, or if lr is constant: 1.0)
-        "Optimizer" : <String>              # Optimization method, either "SGD", "Momentum", "RMSPROP", or "Nesterov" (default "SGD")
+        "Optimizer" : <String>              # Optimization method: "SGD", "Momentum", "AdaGrad", "Nesterov", "RMSProp", "AdaDelta", "Adam" (default "SGD")
         "CheckpointName" : <String>         # Location to write checkpoint information, appended with epoch number and ".nc" (default "check")
         "CheckpointInterval" : <Integer>    # Number of epochs between writing checkpoint data (default 1)
         "ShuffleIndices" : <Boolean>        # Shuffle training examples once per epoch? (default false)

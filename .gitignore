@@ -14,3 +14,4 @@ java/target
 java/target/**
 .gitignore
 
+tst/unittests/build/
