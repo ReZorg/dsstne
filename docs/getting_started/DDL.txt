@@ -1,5 +1,43 @@
 NetCDF Binary data file format 0.2
 
+Generalized DDL catalog (categories and known types):
+
+Category: Input text dataset type (`generateNetCDF -t`)
+    indicator
+    analog
+
+Category: NetCDF dataset kind (`kindN`)
+    Numeric
+    Image
+    Audio
+
+Category: NetCDF dataset data type (`dataTypeN`)
+    UInt
+    Int
+    LLInt
+    ULLInt
+    Float
+    Double
+    RGB8
+    RGB16
+    UChar
+    Char
+
+Category: Dataset attributes (`attributesN` bitmask flags)
+    Sparse
+    Boolean
+    Compressed
+    Recurrent
+    Mutable
+    SparseIgnoreZero
+    Indexed
+    Weighted
+
+Category: Dataset sharding mode
+    None
+    Model
+    Data
+
 NetCDF variables
 datasets (int)                      # of datasets in file
 

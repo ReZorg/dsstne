@@ -1,5 +1,23 @@
 Command Definition Language (Rev 0.1):
 
+Generalized CDL catalog (categories and known types):
+
+Category: Command
+    Train
+    Predict
+    Validate
+
+Category: TrainingParameters.Optimizer
+    Accepted in current CDL JSON parser: SGD, Nesterov
+    Known training modes in engine: SGD, Momentum, AdaGrad, Nesterov, RMSProp, AdaDelta, Adam
+
+Category: Parameter blocks
+    TrainingParameters
+    PredictionParameters
+
+Category: Data source declaration
+    Data (current parser expects a single String path)
+
 TrainingParameters - only used if Command is Train
 PredictionParameters - only used if Command is Predict
 
@@ -7,12 +25,7 @@ PredictionParameters - only used if Command is Predict
     "Network" : <String>                    # NetCDF or JSON file path (default "config.json")
     "Command" : <String>                    # (required) Command to execute "Train", "Predict", or "Validate"
     "RandomSeed" : <Integer>                # Initializes RNG for reproducible runs (default -1, sets from time of day)
-    "Data" : [                              # (required) List of data source files
-        <String>
-        .
-        .
-        .
-    ],
+    "Data" : <String>                       # (required) Data source file path
     "TrainingParameters" : {
         "Epochs" : <Integer>                # (required) Number of training epochs
         "MiniBatch" : <Integer>             # Mini-batch size (default 500, use 0 for entire dataset)
