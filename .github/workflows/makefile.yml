@@ -22,7 +22,7 @@ jobs:
     - name: Build unit tests
       working-directory: tst/unittests
       run: |
-        mkdir build
+        mkdir -p build
         cd build
         cmake ..
         make
