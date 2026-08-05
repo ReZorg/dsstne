@@ -187,7 +187,7 @@ public:
     
     void TestFixedSeedValue() {
         // FIXED_SEED should be a specific value for reproducibility
-        CPPUNIT_ASSERT_EQUAL(12134ull, FIXED_SEED);
+        CPPUNIT_ASSERT_EQUAL(12134ul, FIXED_SEED);
     }
     
     CPPUNIT_TEST_SUITE(TestConstants);
