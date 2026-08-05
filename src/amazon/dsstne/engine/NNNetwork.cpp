@@ -3431,6 +3431,8 @@ NNNetwork* LoadNeuralNetworkJSON(const string& fname, const uint32_t batch, cons
                                         ldl._activation = Activation::RectifiedLinear;
                                     else if ((s.compare("lrelu") == 0) || (s.compare("leakyrectifiedlinear") == 0))
                                         ldl._activation = Activation::LeakyRectifiedLinear;
+                                    else if ((s.compare("prelu") == 0) || (s.compare("parametricrectifiedlinear") == 0))
+                                        ldl._activation = Activation::ParametricRectifiedLinear;
                                     else if ((s.compare("elu") == 0) || (s.compare("exponentiallinear") == 0))
                                         ldl._activation = Activation::ExponentialLinear;
                                     else if ((s.compare("selu") == 0) || (s.compare("scaledexponentiallinear") == 0))
