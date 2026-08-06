@@ -66,10 +66,10 @@ void StreamingDataLoader::addDenseData(const float* data, uint32_t numSamples, u
         batch.width = width;
         batch.batchSize = std::min(_batchSize, numSamples - samplesProcessed);
         
-        // Copy data for this batch
-        size_t batchDataSize = batch.batchSize * width;
+        // Copy data for this batch - use size_t to avoid overflow
+        size_t batchDataSize = static_cast<size_t>(batch.batchSize) * static_cast<size_t>(width);
         batch.data.resize(batchDataSize);
-        std::memcpy(batch.data.data(), data + (samplesProcessed * width), 
+        std::memcpy(batch.data.data(), data + (static_cast<size_t>(samplesProcessed) * static_cast<size_t>(width)), 
                     batchDataSize * sizeof(float));
         
         // Add to input queue

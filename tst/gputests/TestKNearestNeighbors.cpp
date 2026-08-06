@@ -315,7 +315,7 @@ private:
      */
     std::vector<float> generateRandomVectors(int numVectors, int dim) {
         std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-        std::vector<float> vectors(numVectors * dim);
+        std::vector<float> vectors(static_cast<size_t>(numVectors) * static_cast<size_t>(dim));
         
         for (size_t i = 0; i < vectors.size(); ++i) {
             vectors[i] = dist(_gen);

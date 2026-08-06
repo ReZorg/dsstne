@@ -15,6 +15,10 @@ on:
         required: false
         default: 'self-hosted-gpu'
 
+# Default permissions for all jobs - least privilege principle
+permissions:
+  contents: read
+
 env:
   CUDA_VERSION: '11.8'
   BUILD_TYPE: Release

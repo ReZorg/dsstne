@@ -50,7 +50,7 @@ struct EmbeddingResult {
     
     EmbeddingResult() : gpuEmbeddings(nullptr), batchSize(0), embeddingDim(0) {}
     
-    size_t totalSize() const { return batchSize * embeddingDim; }
+    size_t totalSize() const { return static_cast<size_t>(batchSize) * static_cast<size_t>(embeddingDim); }
 };
 
 /**
