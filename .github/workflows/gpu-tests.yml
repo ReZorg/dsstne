@@ -1,0 +1,193 @@
+# GPU Tests Workflow for Amazon DSSTNE
+# Requires self-hosted runner with NVIDIA GPU
+
+name: GPU Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      gpu_runner:
+        description: 'GPU runner label'
+        required: false
+        default: 'self-hosted-gpu'
+
+# Default permissions for all jobs - least privilege principle
+permissions:
+  contents: read
+
+env:
+  CUDA_VERSION: '11.8'
+  BUILD_TYPE: Release
+
+jobs:
+  #############################################################################
+  # GPU Build and Tests (requires self-hosted GPU runner)
+  #############################################################################
+  gpu-tests:
+    name: GPU Tests
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check CUDA availability
+        run: |
+          nvidia-smi
+          nvcc --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcppunit-dev \
+            libnetcdf-dev \
+            libnetcdf-c++4-dev \
+            libjsoncpp-dev \
+            libopenmpi-dev \
+            cmake
+
+      - name: Build DSSTNE
+        env:
+          CUDA_VISIBLE_DEVICES: 0
+        run: |
+          make clean || true
+          make -j$(nproc)
+
+      - name: Build GPU tests
+        run: |
+          cd tst
+          make clean || true
+          make -j$(nproc)
+
+      - name: Run GPU tests
+        env:
+          CUDA_VISIBLE_DEVICES: 0
+          DSSTNE_VGPU_MODE: 1
+        run: |
+          cd tst
+          make run-tests
+
+      - name: Upload GPU test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-test-results
+          path: tst/test-results/
+          retention-days: 7
+
+  #############################################################################
+  # vGPU Tests (for virtual GPU environments)
+  #############################################################################
+  vgpu-tests:
+    name: vGPU Tests
+    runs-on: [self-hosted, vgpu]
+    timeout-minutes: 60
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check vGPU availability
+        run: |
+          nvidia-smi
+          echo "vGPU Profile:"
+          nvidia-smi -q | grep -A 5 "GPU Memory"
+
+      - name: Set vGPU environment
+        run: |
+          export DSSTNE_VGPU_MODE=1
+          export CUDA_MEMORY_POOL_SIZE=2048
+          echo "DSSTNE_VGPU_MODE=1" >> $GITHUB_ENV
+          echo "CUDA_MEMORY_POOL_SIZE=2048" >> $GITHUB_ENV
+
+      - name: Build DSSTNE (vGPU optimized)
+        env:
+          CUDA_VISIBLE_DEVICES: 0
+        run: |
+          make clean || true
+          make -j$(nproc)
+
+      - name: Run vGPU tests
+        env:
+          CUDA_VISIBLE_DEVICES: 0
+        run: |
+          cd tst
+          make run-tests
+        timeout-minutes: 45
+
+  #############################################################################
+  # Multi-GPU Tests
+  #############################################################################
+  multi-gpu-tests:
+    name: Multi-GPU Tests
+    runs-on: [self-hosted, multi-gpu]
+    timeout-minutes: 90
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check GPU topology
+        run: |
+          nvidia-smi topo -m
+          nvidia-smi -L
+
+      - name: Build DSSTNE
+        run: |
+          make clean || true
+          make -j$(nproc)
+
+      - name: Run multi-GPU tests
+        run: |
+          cd tst
+          make -j$(nproc)
+          # Run with MPI across multiple GPUs
+          mpirun -np 2 ./bin/gputests --multi-gpu
+
+  #############################################################################
+  # Performance Benchmarks
+  #############################################################################
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 120
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build DSSTNE
+        run: |
+          make clean || true
+          make -j$(nproc)
+
+      - name: Run benchmarks
+        run: |
+          cd benchmarks
+          ./run_benchmarks.sh > benchmark-results.json 2>&1 || true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmarks/benchmark-results.json
+          retention-days: 30
+
+      - name: Compare with baseline
+        run: |
+          if [ -f benchmarks/baseline.json ]; then
+            python3 benchmarks/compare_benchmarks.py \
+              --baseline benchmarks/baseline.json \
+              --current benchmarks/benchmark-results.json \
+              --threshold 5
+          fi
+        continue-on-error: true

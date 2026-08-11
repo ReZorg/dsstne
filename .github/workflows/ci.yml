@@ -1,0 +1,294 @@
+# GitHub Actions CI/CD for Amazon DSSTNE
+# This replaces the legacy Travis CI configuration
+
+name: CI
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+  workflow_dispatch:
+
+# Default permissions for all jobs - least privilege principle
+permissions:
+  contents: read
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  #############################################################################
+  # CPU Build and Unit Tests (No GPU required)
+  #############################################################################
+  build-cpu:
+    name: CPU Build (${{ matrix.compiler }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc-11
+            cc: gcc-11
+            cxx: g++-11
+          - compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+          - compiler: clang-14
+            cc: clang-14
+            cxx: clang++-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ${{ matrix.compiler }} \
+            libcppunit-dev \
+            libnetcdf-dev \
+            libnetcdf-c++4-dev \
+            libjsoncpp-dev \
+            libopenmpi-dev \
+            cmake \
+            ninja-build
+
+      - name: Build unit tests
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cd tst/unittests
+          mkdir -p build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+          ninja
+
+      - name: Run unit tests
+        run: |
+          cd tst/unittests/build
+          LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./unittests
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.compiler }}
+          path: tst/unittests/build/test-results.xml
+          retention-days: 7
+
+  #############################################################################
+  # Static Analysis
+  #############################################################################
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cppcheck \
+            clang-tidy-14 \
+            libnetcdf-dev \
+            libnetcdf-c++4-dev \
+            libjsoncpp-dev \
+            libopenmpi-dev
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,style,performance \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --error-exitcode=0 \
+            --xml --xml-version=2 \
+            src/amazon/dsstne 2> cppcheck-results.xml
+        continue-on-error: true
+
+      - name: Upload cppcheck results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-results
+          path: cppcheck-results.xml
+          retention-days: 7
+
+  #############################################################################
+  # Documentation Build
+  #############################################################################
+  docs:
+    name: Documentation
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Generate Doxygen documentation
+        run: |
+          if [ -f Doxyfile ]; then
+            doxygen Doxyfile
+          else
+            echo "No Doxyfile found, skipping documentation generation"
+          fi
+        continue-on-error: true
+
+  #############################################################################
+  # Python Binding Tests
+  #############################################################################
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest
+
+      - name: Run Python tests
+        run: |
+          if [ -d python/tests ]; then
+            cd python
+            pytest tests/ -v --tb=short
+          else
+            echo "No Python tests found"
+          fi
+        continue-on-error: true
+
+  #############################################################################
+  # Java Tests
+  #############################################################################
+  java-tests:
+    name: Java Tests
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run Java tests
+        run: |
+          cd java
+          mvn test -B --fail-at-end
+        continue-on-error: true
+
+      - name: Upload Java test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-results
+          path: java/target/surefire-reports/
+          retention-days: 7
+
+  #############################################################################
+  # Code Coverage (when available)
+  #############################################################################
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-22.04
+    needs: build-cpu
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            g++-11 \
+            gcovr \
+            libcppunit-dev \
+            libnetcdf-dev \
+            libnetcdf-c++4-dev \
+            libjsoncpp-dev \
+            libopenmpi-dev \
+            cmake
+
+      - name: Build with coverage
+        env:
+          CC: gcc-11
+          CXX: g++-11
+          CXXFLAGS: "--coverage -fprofile-arcs -ftest-coverage"
+          LDFLAGS: "--coverage"
+        run: |
+          cd tst/unittests
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Debug
+          make
+
+      - name: Run tests for coverage
+        run: |
+          cd tst/unittests/build
+          LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH ./unittests || true
+
+      - name: Generate coverage report
+        run: |
+          cd tst/unittests/build
+          gcovr -r ../../.. --xml-pretty -o coverage.xml
+        continue-on-error: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: tst/unittests/build/coverage.xml
+          retention-days: 7
+
+  #############################################################################
+  # Release Build (on tags)
+  #############################################################################
+  release:
+    name: Release Build
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-cpu, java-tests]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create release artifacts
+        run: |
+          mkdir -p release
+          tar -czf release/dsstne-source-${{ github.ref_name }}.tar.gz \
+            --exclude='.git' \
+            --exclude='build' \
+            .
+          
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release/
+          retention-days: 30
