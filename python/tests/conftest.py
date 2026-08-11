@@ -55,7 +55,13 @@ def sample_sparse_data():
 
 @pytest.fixture
 def mock_model_path(temp_dir: str) -> str:
-    """Create a mock model file path."""
+    """Create a mock model file path.
+
+    Skips the requesting test when the DSSTNE C extension is unavailable,
+    since a Network cannot be loaded without it.
+    """
+    if not _extension_available():
+        pytest.skip("DSSTNE extension not available")
     path = os.path.join(temp_dir, 'test_model.nc')
     # Create an empty file (real tests would need actual model)
     open(path, 'w').close()
@@ -70,17 +76,6 @@ def reset_numpy_random_state():
 
 
 # Skip markers
-requires_cuda = pytest.mark.skipif(
-    not _cuda_available(),
-    reason="CUDA not available"
-)
-
-requires_extension = pytest.mark.skipif(
-    not _extension_available(),
-    reason="DSSTNE extension not available"
-)
-
-
 def _cuda_available() -> bool:
     """Check if CUDA is available."""
     try:
@@ -97,3 +92,14 @@ def _extension_available() -> bool:
         return dsstne.is_available()
     except Exception:
         return False
+
+
+requires_cuda = pytest.mark.skipif(
+    not _cuda_available(),
+    reason="CUDA not available"
+)
+
+requires_extension = pytest.mark.skipif(
+    not _extension_available(),
+    reason="DSSTNE extension not available"
+)

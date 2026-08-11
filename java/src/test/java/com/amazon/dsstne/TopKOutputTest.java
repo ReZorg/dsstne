@@ -64,4 +64,18 @@ public class TopKOutputTest {
         Assert.assertEquals(batchSize, output.getDim().examples);
     }
 
+    @Test
+    public void testOutputTopKMultiDimensional() {
+        int k = 10;
+        NNLayer ndLayer = new NNLayer(layerName, datasetName, Kind.Input.ordinal(), Attribute.None, 3, 8, 4, 2);
+        NetworkConfig config = NetworkConfig.with().batchSize(batchSize).k(k).build();
+        TopKOutput output = TopKOutput.create(config, ndLayer);
+        // N-D outputs are flattened; top-k returns k (index, score) pairs per example
+        Assert.assertEquals(k, output.getDim().x);
+        Assert.assertEquals(1, output.getDim().y);
+        Assert.assertEquals(1, output.getDim().z);
+        Assert.assertEquals(1, output.getDim().dimensions);
+        Assert.assertEquals(batchSize, output.getDim().examples);
+    }
+
 }

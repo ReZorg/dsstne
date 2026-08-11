@@ -15,6 +15,8 @@
  *
  */
 
+#include <stdexcept>
+
 #include "DsstneContext.h"
 
 namespace
@@ -45,11 +47,11 @@ DsstneContext::DsstneContext(const string &networkFilename, uint32_t batchSize, 
 
         if(maxK != ALL)
         {
-            // FIXME this only works for 1-D outputs
-            if ((*it)->GetNumDimensions() > 1)
-            {
-                std::runtime_error("topK only supported on 1-D output layers");
-            }
+            /*
+             * N-D output layers are supported by treating the output as a flattened
+             * 1-D buffer of length Nx * Ny * Nz per example; returned topK indexes
+             * are positions into that flattened (row-major) buffer.
+             */
             size_t outputBufferLength = maxK * batchSize;
             printf(
                 "DsstneContext::DsstneContext: Allocating output score and index buffers, each of size %zu for output layer %s\n",

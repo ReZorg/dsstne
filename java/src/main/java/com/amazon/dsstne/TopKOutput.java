@@ -58,9 +58,13 @@ public class TopKOutput {
         if (config.getK() == NetworkConfig.ALL) {
             outputDataset = new TopKOutput(new Dim(outputLayerDim, batchSize));
         } else {
-            if(outputLayerDim.dimensions > 1) {
-                throw new IllegalArgumentException("Top k outputs only supported on 1-D outputs");
-            }
+            /*
+             * Top-k is computed over the output layer flattened to 1-D
+             * (x * y * z elements per example, row-major). The returned indexes
+             * are positions into that flattened buffer, so the result is always
+             * k (index, score) pairs per example regardless of the layer's
+             * dimensionality.
+             */
             outputDataset = new TopKOutput(Dim._1d(k, batchSize));
         }
         outputDataset.setName(outputLayer.getDatasetName());

@@ -156,16 +156,14 @@ void SamplesFilter::loadFilter(unordered_map<string, unsigned int>& xMInput,
      @param xMSamples: $CUST, $GLOBAL_INDEX_FOR_CUST
      @param filterFilePath: name of sample filter file. Samples filter should be as below:
                             $CUS    $FEATURE,$VALUE:$FEATURE,$VALUE
-     
-     
 
-     TODO There is a hack currently where when the value is >10.0 i am assuming to zero
-     The reason is currently watch Filters have watch dates as the first Suffix
-    
- 
-     TODO:larger number of inserts time will be wasted for resizing the vector
-     and the size is the maximum of the Samples. Might not be a good  use case when we have sparse
-     Filter
+     Filter values are used verbatim: each output unit referenced by the filter is
+     multiplied by the associated $VALUE (defaulting to 0.0 when no value is given,
+     which zeroes out the unit). The legacy hack that zeroed values greater than 10.0
+     has been removed; supply an explicit value of 0.0 to suppress a feature.
+
+     The filter storage is pre-allocated to xMSamples.size() entries up front,
+     so no incremental vector resizing occurs while loading filters.
     */
 
     samplefilters.reset(new vector<unique_ptr<unordered_map<int, float>>>(xMSamples.size()));

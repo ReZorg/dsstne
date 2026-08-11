@@ -32,7 +32,7 @@ import java.util.function.Consumer;
  * 
  * <p>Example usage:
  * <pre>{@code
- * AsyncDsstne async = new AsyncDsstne(dsstne);
+ * AsyncDsstne async = new AsyncDsstne(network);
  * 
  * // Single async operation
  * CompletableFuture<TopKOutput[]> future = async.predictAsync(inputData);
@@ -55,31 +55,31 @@ import java.util.function.Consumer;
  */
 public class AsyncDsstne implements AutoCloseable {
 
-    private final Dsstne dsstne;
+    private final NNNetwork network;
     private final ExecutorService executor;
     private final boolean ownsExecutor;
 
     /**
      * Creates an AsyncDsstne with a default thread pool.
      * 
-     * @param dsstne the underlying DSSTNE instance
+     * @param network the underlying network instance
      */
-    public AsyncDsstne(Dsstne dsstne) {
-        this(dsstne, createDefaultExecutor(), true);
+    public AsyncDsstne(NNNetwork network) {
+        this(network, createDefaultExecutor(), true);
     }
 
     /**
      * Creates an AsyncDsstne with a custom executor.
      * 
-     * @param dsstne the underlying DSSTNE instance
+     * @param network the underlying network instance
      * @param executor the executor to use for async operations
      */
-    public AsyncDsstne(Dsstne dsstne, ExecutorService executor) {
-        this(dsstne, executor, false);
+    public AsyncDsstne(NNNetwork network, ExecutorService executor) {
+        this(network, executor, false);
     }
 
-    private AsyncDsstne(Dsstne dsstne, ExecutorService executor, boolean ownsExecutor) {
-        this.dsstne = Objects.requireNonNull(dsstne, "dsstne cannot be null");
+    private AsyncDsstne(NNNetwork network, ExecutorService executor, boolean ownsExecutor) {
+        this.network = Objects.requireNonNull(network, "network cannot be null");
         this.executor = Objects.requireNonNull(executor, "executor cannot be null");
         this.ownsExecutor = ownsExecutor;
     }
@@ -92,20 +92,7 @@ public class AsyncDsstne implements AutoCloseable {
      */
     public CompletableFuture<TopKOutput[]> predictAsync(NNDataSet[] inputData) {
         return CompletableFuture.supplyAsync(() -> {
-            return dsstne.predict(inputData);
-        }, executor);
-    }
-
-    /**
-     * Asynchronously load input data and run prediction.
-     * 
-     * @param inputData the input data for prediction
-     * @param k number of top predictions to return
-     * @return a CompletableFuture containing the top-K predictions
-     */
-    public CompletableFuture<TopKOutput[]> predictTopKAsync(NNDataSet[] inputData, int k) {
-        return CompletableFuture.supplyAsync(() -> {
-            return dsstne.predict(inputData);
+            return network.predict(inputData);
         }, executor);
     }
 
@@ -125,7 +112,7 @@ public class AsyncDsstne implements AutoCloseable {
                 progressCallback.accept(0.0f);
             }
             
-            TopKOutput[] results = dsstne.predict(inputData);
+            TopKOutput[] results = network.predict(inputData);
             
             if (progressCallback != null) {
                 progressCallback.accept(1.0f);
@@ -161,12 +148,12 @@ public class AsyncDsstne implements AutoCloseable {
     }
 
     /**
-     * Get the underlying Dsstne instance.
+     * Get the underlying network instance.
      * 
-     * @return the DSSTNE instance
+     * @return the network instance
      */
-    public Dsstne getDsstne() {
-        return dsstne;
+    public NNNetwork getNetwork() {
+        return network;
     }
 
     /**
@@ -211,11 +198,11 @@ public class AsyncDsstne implements AutoCloseable {
      * Builder for AsyncDsstne.
      */
     public static class Builder {
-        private Dsstne dsstne;
+        private NNNetwork network;
         private ExecutorService executor;
 
-        public Builder dsstne(Dsstne dsstne) {
-            this.dsstne = dsstne;
+        public Builder network(NNNetwork network) {
+            this.network = network;
             return this;
         }
 
@@ -225,14 +212,14 @@ public class AsyncDsstne implements AutoCloseable {
         }
 
         public AsyncDsstne build() {
-            if (dsstne == null) {
-                throw new IllegalStateException("dsstne must be set");
+            if (network == null) {
+                throw new IllegalStateException("network must be set");
             }
             
             if (executor != null) {
-                return new AsyncDsstne(dsstne, executor);
+                return new AsyncDsstne(network, executor);
             } else {
-                return new AsyncDsstne(dsstne);
+                return new AsyncDsstne(network);
             }
         }
     }

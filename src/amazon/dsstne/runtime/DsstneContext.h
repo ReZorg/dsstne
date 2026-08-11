@@ -18,6 +18,8 @@
 #ifndef DSSTNECONTEXT_H_
 #define DSSTNECONTEXT_H_
 
+#include <stdexcept>
+
 #include "amazon/dsstne/engine/GpuTypes.h"
 #include "amazon/dsstne/engine/NNTypes.h"
 #include "amazon/dsstne/engine/NNLayer.h"
@@ -62,7 +64,7 @@ class DsstneContext
         DsstneContext * dc = (DsstneContext *) ptr;
         if (dc == nullptr)
         {
-            std::runtime_error("Cannot convert nullptr to DsstneContext");
+            throw std::runtime_error("Cannot convert nullptr to DsstneContext");
         }
         return dc;
     }

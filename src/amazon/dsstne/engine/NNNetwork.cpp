@@ -2458,22 +2458,20 @@ void NNNetwork::CalculatePropagationOrder()
 // Validates network gradients numerically
 bool NNNetwork::Validate()
 {
-    // below parameters are used only for numerical gradient validation (non centered formula),
+    // below parameters are used only for numerical gradient validation,
     // that is why neural network will be tested only in SGD mode
     bool result                 = true;
     const NNFloat delta         = (NNFloat)0.001;
-    const NNFloat alpha         = (NNFloat)1.0;
     const NNFloat lambda        = (NNFloat)0.0; // regularization parameter (no need for bias test)
     const NNFloat lambda1       = (NNFloat)0.0; // regularization parameter (no need for bias test)
-    const NNFloat mu            = (NNFloat)0.0; // no momentum
-    const NNFloat mu1           = (NNFloat)0.0; // no momentum
 
     // There are couple of issues with numerical gradient validation:
-    // The deeper network the higher numerical error in the cost function evaluation;
-    // Current implementation uses non centered derivative formula and it is not the best choice (TODO).
-    // Because of these two reasons threshold tuning becomes empirical,
-    // and the goal is choose value as small as possible so that probability of unit test failure
-    // in case when gradient implementation is correct should be zero
+    // The deeper network the higher numerical error in the cost function evaluation.
+    // Gradients are approximated with the centered difference formula
+    // dE/dw ~ (E(w + delta) - E(w - delta)) / (2 * delta), whose truncation error is O(delta^2),
+    // which is far more accurate than the one sided (non centered) formula previously used here.
+    // Threshold tuning is still empirical, and the goal is choose value as small as possible
+    // so that probability of unit test failure in case when gradient implementation is correct should be zero
     // and probability of detection of incorrect gradient implementation should be as high as possible.
     // On deeper networks threshold 10 gives false positive failures even though gradient implementation is correct. So I set to 20
     const NNFloat epsilon = delta * 20.f;
@@ -2546,10 +2544,18 @@ bool NNNetwork::Validate()
         w->_pbWeightGradient->Download(vWeightGradient.back().data());
     }
 
-    // get gradients for bias (bias gradient is not stored, so get it throgh UpdateWeights)
-    vector< vector<NNFloat>> vBiasGradient;
-    UpdateWeights(alpha, lambda, lambda1, mu, mu1);
+    // Calculate the batch size actually in flight (same formula used by UpdateWeights)
+    uint32_t batch = _batch;
+    if (_position + batch > _examples)
+        batch = _examples - _position;
 
+    // Compute explicit bias gradients directly from the output layer deltas.
+    // For fully connected (Linear) weights the bias update kernels (e.g. kSGDUpdateBiases)
+    // apply a gradient of sum(delta) / batch, stored here negated to match the
+    // convention used for weight gradients (gradient ~ -dE/db).
+    // For cuDNN (Convolution) weights the gradient is already computed into _pbBiasGradient
+    // by cudnnConvolutionBackwardBias during BackPropagate with the same sign convention.
+    vector< vector<NNFloat>> vBiasGradient;
     for (int id = 0; id < _vWeight.size(); id++)
     {
         NNWeight* w = _vWeight[id];
@@ -2557,17 +2563,27 @@ bool NNNetwork::Validate()
         vector<NNFloat>& bias = vBiasGradient[id];
 
         // Display information about current weight set
-        cout << "Validating weights between layer " << w->_inputLayer._name << " and " << w->_outputLayer._name << endl;
+        cout << "Calculating bias gradient between layer " << w->_inputLayer._name << " and " << w->_outputLayer._name << endl;
 
-        w->_pbWeight->Upload(w->_vWeight.data()); // restore weights
-        // get bias gradient (TODO instead of this hack it is better to have explicit bias gradient)
-        vector<NNFloat> bias_g(w->_pbBias->_length);
-        w->_pbBias->Download(bias_g.data());
-        for (int b = 0; b < bias_g.size(); b++)
+        if (w->_transform == NNWeight::Transform::Linear)
         {
-          bias[b] = bias_g[b] - w->_vBias[b];
+            uint32_t width = w->_localBiasSize;
+            vector<NNFloat> vDelta(w->_outputLayer._pbDelta->_length);
+            w->_outputLayer._pbDelta->Download(vDelta.data());
+            for (uint32_t b = 0; b < width; b++)
+            {
+                NNFloat sum = (NNFloat)0.0;
+                for (uint32_t i = 0; i < batch; i++)
+                {
+                    sum += vDelta[i * width + b];
+                }
+                bias[b] = -sum / (NNFloat)batch;
+            }
         }
-        w->_pbBias->Upload(w->_vBias.data()); // restore bias
+        else
+        {
+            w->_pbBiasGradient->Download(bias.data());
+        }
     }
 
     // Now tweak each weight and bias individually to determine change in loss function
@@ -2583,20 +2599,31 @@ bool NNNetwork::Validate()
         {
             NNFloat oldWeight                               = w->_vWeight[i];
             // weight gradient is normalized by -1 / (pSrcWeight->_sharingCount * _batch), so delta is normalized the same way
-            w->_vWeight[i]                                 += delta / (_batch * w->_sharingCount);
+            NNFloat effectiveDelta                          = delta / (_batch * w->_sharingCount);
+
+            // Centered difference: evaluate loss at w + delta and w - delta
+            w->_vWeight[i]                                  = oldWeight + effectiveDelta;
             w->_pbWeight->Upload(w->_vWeight.data());
             PredictValidationBatch();
+            NNFloat errorPlusTraining, errorPlusRegularization;
+            tie(errorPlusTraining, errorPlusRegularization) = CalculateError(lambda, lambda1);
+            NNFloat errorPlus                               = errorPlusTraining + errorPlusRegularization;
+
+            w->_vWeight[i]                                  = oldWeight - effectiveDelta;
+            w->_pbWeight->Upload(w->_vWeight.data());
+            PredictValidationBatch();
+            NNFloat errorMinusTraining, errorMinusRegularization;
+            tie(errorMinusTraining, errorMinusRegularization) = CalculateError(lambda, lambda1);
+            NNFloat errorMinus                              = errorMinusTraining + errorMinusRegularization;
+
             w->_vWeight[i]                                  = oldWeight;
-            NNFloat errorTraining, errorRegularization, error;
-            tie(errorTraining, errorRegularization)       = CalculateError(lambda, lambda1);
-            error                                           = errorTraining + errorRegularization;
-            NNFloat dEdW                                    = (error - initialError) / delta;
+            NNFloat dEdW                                    = (errorPlus - errorMinus) / (2.f * delta);
             NNFloat weightGradient = vWeightGradient[id][i];
-            cout << "errorTraining " << errorTraining << "; errorRegularization " << errorRegularization <<
+            cout << "errorPlus " << errorPlus << "; errorMinus " << errorMinus <<
                             "; dEdW " << dEdW << "; weightGradient " << weightGradient <<  endl;
             if (fabs(dEdW + weightGradient) > epsilon)
             {
-                cout << error << " " << initialError << endl;
+                cout << errorPlus << " " << errorMinus << " " << initialError << endl;
                 cout << "Failed Weight " << i << " exceeds error threshold: " << dEdW << " vs " << weightGradient << endl;
                 result = false;
             }
@@ -2608,20 +2635,31 @@ bool NNNetwork::Validate()
         {
             NNFloat oldBias                               = w->_vBias[i];
             // bias gradient is normalized by 1 / (_batch), so delta is normalized the same way
-            w->_vBias[i]                                 += delta / (_batch);
+            NNFloat effectiveDelta                        = delta / (_batch);
+
+            // Centered difference: evaluate loss at b + delta and b - delta
+            w->_vBias[i]                                  = oldBias + effectiveDelta;
             w->_pbBias->Upload(w->_vBias.data());
             PredictValidationBatch();
+            NNFloat errorPlusTraining, errorPlusRegularization;
+            tie(errorPlusTraining, errorPlusRegularization) = CalculateError(lambda, lambda1);
+            NNFloat errorPlus                             = errorPlusTraining + errorPlusRegularization;
+
+            w->_vBias[i]                                  = oldBias - effectiveDelta;
+            w->_pbBias->Upload(w->_vBias.data());
+            PredictValidationBatch();
+            NNFloat errorMinusTraining, errorMinusRegularization;
+            tie(errorMinusTraining, errorMinusRegularization) = CalculateError(lambda, lambda1);
+            NNFloat errorMinus                            = errorMinusTraining + errorMinusRegularization;
+
             w->_vBias[i]                                  = oldBias;
-            NNFloat errorTraining, errorRegularization, error;
-            tie(errorTraining, errorRegularization)       = CalculateError(lambda, lambda1);
-            error                                           = errorTraining + errorRegularization;
-            NNFloat dEdb                                    = (error - initialError) / delta;
+            NNFloat dEdb                                    = (errorPlus - errorMinus) / (2.f * delta);
             NNFloat biasGradient = vBiasGradient[id][i];
-            cout << "errorTraining " << errorTraining << "; errorRegularization " << errorRegularization <<
+            cout << "errorPlus " << errorPlus << "; errorMinus " << errorMinus <<
                             "; dEdb " << dEdb << "; biasGradient " << biasGradient <<  endl;
             if (fabs(dEdb + biasGradient) > epsilon)
             {
-                cout << error << " " << initialError << endl;
+                cout << errorPlus << " " << errorMinus << " " << initialError << endl;
                 cout << "Failed Bias " << i << " exceeds error threshold: " << dEdb << " vs " << biasGradient << endl;
                 result = false;
             }
