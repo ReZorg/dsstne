@@ -81,8 +81,8 @@ class TestTopKResult:
         result = TopKResult(indices=indices, scores=scores, k=3)
         
         idx, sc = result[0]
-        np.testing.assert_array_equal(idx, [1, 2, 3])
-        np.testing.assert_array_equal(sc, [0.9, 0.8, 0.7])
+        np.testing.assert_array_equal(idx, np.array([1, 2, 3], dtype=np.uint32))
+        np.testing.assert_array_equal(sc, np.array([0.9, 0.8, 0.7], dtype=np.float32))
 
 
 class TestNetwork:

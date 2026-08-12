@@ -10,7 +10,7 @@
 
 // The following .h files contain function definitions in order that those functions are compiled in the same compilation unit
 // as this dsstnemodule.c file. A single compilation unit is necessary so that NumPy functions such as PyArray_SimpleNew() appear
-// in the same compilation unit as the import_matrix() function that is called from the initdsstne() function below; otherwise,
+// in the same compilation unit as the import_array() macro that is invoked from the PyInit_dsstne() function below; otherwise,
 // a segmentation fault will occur.
 #include "dsstnemodule.h"
 #include "dsstnecalculate.h"
@@ -430,9 +430,19 @@ static PyMethodDef dsstneMethods[] = {
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
-// See https://docs.scipy.org/doc/numpy/user/c-info.how-to-extend.html
-PyMODINIT_FUNC initdsstne(void) {
-    (void) Py_InitModule("dsstne", dsstneMethods);
-    import_array();
-    // Add initialization code here
+// See https://docs.python.org/3/extending/extending.html#the-module-s-method-table-and-initialization-function
+static struct PyModuleDef dsstneModuleDef = {
+    PyModuleDef_HEAD_INIT,
+    "dsstne",        /* name of module */
+    NULL,            /* module documentation, may be NULL */
+    -1,              /* size of per-interpreter state of the module,
+                        or -1 if the module keeps state in global variables. */
+    dsstneMethods
+};
+
+PyMODINIT_FUNC PyInit_dsstne(void) {
+    PyObject* module = PyModule_Create(&dsstneModuleDef);
+    if (module == NULL) return NULL;
+    import_array(); // Initializes the NumPy C API; returns NULL upon failure
+    return module;
 }

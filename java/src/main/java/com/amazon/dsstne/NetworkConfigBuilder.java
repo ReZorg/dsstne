@@ -19,8 +19,12 @@ package com.amazon.dsstne;
 import java.util.Objects;
 
 /**
- * Builder pattern for creating NetworkConfig instances.
- * 
+ * Validating builder for creating {@link NetworkConfig} instances.
+ *
+ * <p>Unlike the Lombok-generated {@code NetworkConfig.with()} builder, this
+ * builder validates its arguments eagerly and fails fast with descriptive
+ * error messages.</p>
+ *
  * <p>Example usage:
  * <pre>{@code
  * NetworkConfig config = NetworkConfigBuilder.builder()
@@ -29,17 +33,15 @@ import java.util.Objects;
  *     .maxK(100)
  *     .build();
  * }</pre>
- * 
+ *
  * @since 2.0
  */
 public final class NetworkConfigBuilder {
 
     private String networkFilePath;
+    private String networkName;
     private int batchSize = 32;
-    private int maxK = -1;
-    private boolean shuffleIndices = true;
-    private String errorFunction = "CrossEntropy";
-    private int gpuDeviceId = -1;
+    private int maxK = NetworkConfig.ALL;
 
     /**
      * Private constructor - use {@link #builder()} to create instances.
@@ -49,7 +51,7 @@ public final class NetworkConfigBuilder {
 
     /**
      * Creates a new builder instance.
-     * 
+     *
      * @return a new builder
      */
     public static NetworkConfigBuilder builder() {
@@ -58,7 +60,7 @@ public final class NetworkConfigBuilder {
 
     /**
      * Creates a builder initialized from an existing config.
-     * 
+     *
      * @param config the config to copy from
      * @return a new builder with copied values
      */
@@ -66,13 +68,14 @@ public final class NetworkConfigBuilder {
         Objects.requireNonNull(config, "config cannot be null");
         return builder()
             .networkFilePath(config.getNetworkFilePath())
+            .networkName(config.getNetworkName())
             .batchSize(config.getBatchSize())
-            .maxK(config.getMaxK());
+            .maxK(config.getK());
     }
 
     /**
      * Sets the path to the network file.
-     * 
+     *
      * @param networkFilePath path to the NetCDF model file
      * @return this builder
      */
@@ -82,8 +85,20 @@ public final class NetworkConfigBuilder {
     }
 
     /**
+     * Sets the name of the network. When unset, the name defaults to the
+     * network file name (without the .nc suffix).
+     *
+     * @param networkName name of the network
+     * @return this builder
+     */
+    public NetworkConfigBuilder networkName(String networkName) {
+        this.networkName = networkName;
+        return this;
+    }
+
+    /**
      * Sets the batch size for inference.
-     * 
+     *
      * @param batchSize number of samples to process in parallel (must be positive)
      * @return this builder
      * @throws IllegalArgumentException if batchSize is not positive
@@ -98,55 +113,22 @@ public final class NetworkConfigBuilder {
 
     /**
      * Sets the maximum K for top-K predictions.
-     * 
-     * @param maxK maximum K value (-1 for all predictions)
+     *
+     * @param maxK maximum K value ({@link NetworkConfig#ALL} for the entire output layer)
      * @return this builder
-     * @throws IllegalArgumentException if maxK is less than -1
+     * @throws IllegalArgumentException if maxK is less than -1 or zero
      */
     public NetworkConfigBuilder maxK(int maxK) {
-        if (maxK < -1) {
-            throw new IllegalArgumentException("maxK must be -1 or positive, got: " + maxK);
+        if (maxK < NetworkConfig.ALL || maxK == 0) {
+            throw new IllegalArgumentException("maxK must be -1 (ALL) or positive, got: " + maxK);
         }
         this.maxK = maxK;
         return this;
     }
 
     /**
-     * Sets whether to shuffle indices during training.
-     * 
-     * @param shuffleIndices true to shuffle indices
-     * @return this builder
-     */
-    public NetworkConfigBuilder shuffleIndices(boolean shuffleIndices) {
-        this.shuffleIndices = shuffleIndices;
-        return this;
-    }
-
-    /**
-     * Sets the error function (loss function).
-     * 
-     * @param errorFunction name of the error function
-     * @return this builder
-     */
-    public NetworkConfigBuilder errorFunction(String errorFunction) {
-        this.errorFunction = Objects.requireNonNull(errorFunction, "errorFunction cannot be null");
-        return this;
-    }
-
-    /**
-     * Sets the GPU device ID to use.
-     * 
-     * @param gpuDeviceId device ID (-1 for auto-select)
-     * @return this builder
-     */
-    public NetworkConfigBuilder gpuDeviceId(int gpuDeviceId) {
-        this.gpuDeviceId = gpuDeviceId;
-        return this;
-    }
-
-    /**
      * Validates the configuration.
-     * 
+     *
      * @throws IllegalStateException if configuration is invalid
      */
     private void validate() {
@@ -157,31 +139,27 @@ public final class NetworkConfigBuilder {
 
     /**
      * Builds the NetworkConfig instance.
-     * 
+     *
      * @return a new NetworkConfig
      * @throws IllegalStateException if configuration is invalid
      */
     public NetworkConfig build() {
         validate();
-        return new NetworkConfig(
-            networkFilePath,
-            batchSize,
-            maxK,
-            shuffleIndices,
-            errorFunction,
-            gpuDeviceId
-        );
+        return NetworkConfig.with()
+            .networkFilePath(networkFilePath)
+            .networkName(networkName)
+            .batchSize(batchSize)
+            .k(maxK)
+            .build();
     }
 
     @Override
     public String toString() {
-        return "NetworkConfigBuilder{" +
-            "networkFilePath='" + networkFilePath + '\'' +
-            ", batchSize=" + batchSize +
-            ", maxK=" + maxK +
-            ", shuffleIndices=" + shuffleIndices +
-            ", errorFunction='" + errorFunction + '\'' +
-            ", gpuDeviceId=" + gpuDeviceId +
-            '}';
+        return "NetworkConfigBuilder{"
+            + "networkFilePath='" + networkFilePath + '\''
+            + ", networkName='" + networkName + '\''
+            + ", batchSize=" + batchSize
+            + ", maxK=" + maxK
+            + '}';
     }
 }
