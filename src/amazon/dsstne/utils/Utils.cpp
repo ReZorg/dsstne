@@ -146,7 +146,9 @@ std::vector<std::string> split(const std::string &s, char delim)
 
 bool isDirectory(const string &dirname) {
     struct stat buf;
-    stat(dirname.c_str(), &buf);
+    if (stat(dirname.c_str(), &buf) != 0) {
+        return false;
+    }
     return S_ISDIR(buf.st_mode);
 }
 
@@ -247,4 +249,3 @@ void topKsort<float, unsigned int>(float*, unsigned int*, const int, float*, uns
 
 template
 void topKsort<float, float>(float*, float*, const int, float*, float*, const int, const bool);
-
