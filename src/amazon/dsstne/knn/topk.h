@@ -65,10 +65,13 @@ static const int SM_6X_THREADS_PER_BLOCK                        = 128;
 #endif
 
 /*
- * TODO use kCalculateTopK from amazon/dsstne/engine/kernels.h
- * The reason why we have two versions is that this version accounts
- * for row padding which is required to make rows a multiple of 4 or 8
- * to enable cublas to run the fp16 sgemm kernels on tensorcores.
+ * This is a padding-aware counterpart to kCalculateTopK in
+ * amazon/dsstne/engine/kernels.h. It exists as a separate variant because it
+ * accounts for row padding (widthPadding), which is required to make rows a
+ * multiple of 4 or 8 to enable cublas to run the fp16 sgemm kernels on
+ * tensorcores. The engine version has no widthPadding parameter, so the two are
+ * not drop-in interchangeable; the implementation already reuses the engine's
+ * bitonic sorter (amazon/dsstne/engine/bitonic.h).
  */
 void kCalculateTopK(NNFloat* pOutput, NNFloat *pKey, uint32_t* pValue, uint32_t batch, uint32_t width, uint32_t widthPadding, uint32_t k);
 

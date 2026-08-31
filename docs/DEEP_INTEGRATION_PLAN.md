@@ -1,5 +1,37 @@
 # Amazon DSSTNE - Deep Integration Implementation Plan
 
+> **Status Update (see "Implementation Status" below):** The majority of the
+> features described in this plan and in issue #16 have been implemented and are
+> covered by the CPU unit-test suite (138 tests) and the Python test suite
+> (27 tests). A small number of items that require GPU / multi-GPU hardware to
+> implement and validate remain open.
+
+## Implementation Status
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Centered derivative (`NNNetwork.cpp`) | ✅ Done | Centered difference formula, error `O(delta^2)` |
+| Explicit bias gradient (`_pbBiasGradient`) | ✅ Done | Buffer in `NNWeight.h`, used by `NNNetwork.cpp` |
+| Multi-dimensional topK (`DsstneContext`) | ✅ Done | N-D output flattened to 1-D buffer |
+| Filter >10.0 hack + vector pre-allocation | ✅ Done | See `Filters.cpp` |
+| Streaming data loader | ✅ Done | `utils/StreamingDataLoader.*` + GPU test |
+| Parallelism detector | ✅ Done | `engine/ParallelismDetector.*` |
+| Embedding → KNN pipeline | ✅ Done | `pipeline/EmbeddingExtractor.*`, `NNKnnPipeline.*` |
+| Shared GPU utilities | ✅ Done | `common/GpuCommon.h` |
+| Unified configuration | ✅ Done | `config/DsstneConfig.h` (validation + env overrides) |
+| Centralized error / logging | ✅ Done | `common/DsstneError.h`, `common/Logger.h` |
+| GitHub Actions CI (CPU) | ✅ Done | `.github/workflows/ci.yml` (no GPU required) |
+| GPU/vGPU CI workflows | ✅ Done | `.github/workflows/gpu-tests.yml` (needs self-hosted GPU runner) |
+| Python package + tests | ✅ Done | `python/dsstne/`, `python/tests/` |
+| Java builders / async API | ✅ Done | `NetworkConfigBuilder.java`, `AsyncDsstne.java` |
+| KNN reuses engine bitonic sorter | ✅ Done | `knn/topk.cu` includes `engine/bitonic.h` |
+| Data-parallel weight distribution (`NNWeight.cpp`) | ⬜ Open | Requires multi-GPU hardware to validate |
+| Multi-GPU Node Filter (`NNRecsGenerator.cpp`) | ⬜ Open | Requires multi-GPU hardware to validate |
+| KNN/engine topK full dedup | ⬜ Open | KNN variant is intentionally padding-aware; not drop-in |
+
+The sections below are the original planning document and are retained for
+historical context and for the remaining open items.
+
 ## Executive Summary
 
 This document outlines the implementation plan for the next phase of development focusing on deep integration of standalone features in the Amazon DSSTNE (Deep Scalable Sparse Tensor Network Engine) library. The plan addresses identified gaps, technical debt, and opportunities for enhancement.

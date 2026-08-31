@@ -15,3 +15,8 @@ java/target/**
 .gitignore
 
 tst/unittests/build/
+
+# Python bytecode / test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

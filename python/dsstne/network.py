@@ -161,15 +161,18 @@ class Network:
         """Release resources associated with the network.
         
         This method is idempotent and can be called multiple times.
+        It is also safe to call on a partially-constructed instance
+        (e.g. when __init__ raised before completing), so it uses
+        getattr with defaults rather than assuming attributes exist.
         """
-        if self._is_closed:
+        if getattr(self, '_is_closed', False):
             return
-            
-        if self._handle is not None:
+
+        if getattr(self, '_handle', None) is not None:
             # Release native resources
             # In real implementation, this would call C extension
             self._handle = None
-            
+
         self._is_closed = True
         
     def __enter__(self) -> 'Network':
