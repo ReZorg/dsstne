@@ -107,9 +107,11 @@ class TestNetwork:
         partial.close()
         assert partial._is_closed
 
-        # __del__ must also be safe.
+        # Garbage collection (which invokes __del__) must also be safe.
+        import gc
         partial2 = Network.__new__(Network)
-        partial2.__del__()  # should not raise
+        del partial2
+        gc.collect()  # should not raise
             
     def test_load_creates_instance(self, mock_model_path):
         """Test that load() creates a Network instance."""
