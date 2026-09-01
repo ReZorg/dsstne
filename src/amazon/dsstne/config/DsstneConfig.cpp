@@ -371,7 +371,7 @@ DsstneConfig DsstneConfig::loadYaml(const std::string& path) {
         for (size_t i = 0; i < line.size(); ++i) {
             if (line[i] == '\\' && inQuotes) { ++i; continue; }  // skip escaped char
             if (line[i] == '"') inQuotes = !inQuotes;
-            else if (line[i] == '#' && !inQuotes) { line = line.substr(0, i); break; }
+            else if (line[i] == '#' && !inQuotes) { line.resize(i); break; }
         }
         if (trim(line).empty()) continue;
 
