@@ -92,6 +92,26 @@ class TestNetwork:
         """Test that Network cannot be created directly."""
         with pytest.raises(RuntimeError, match="Use Network.load"):
             Network('model.nc')
+
+    def test_close_safe_on_partially_constructed_instance(self):
+        """Test that __del__/close do not raise when __init__ fails early.
+
+        When Network.__init__ raises before setting _is_closed/_handle
+        (e.g. the "use Network.load" guard), the interpreter still calls
+        __del__ on the partially-constructed object during garbage
+        collection. close() must tolerate missing attributes and not raise.
+        """
+        # Create a partially-constructed instance without running __init__.
+        partial = Network.__new__(Network)
+        # close() must be safe even though no attributes are set.
+        partial.close()
+        assert partial._is_closed
+
+        # Garbage collection (which invokes __del__) must also be safe.
+        import gc
+        partial2 = Network.__new__(Network)
+        del partial2
+        gc.collect()  # should not raise
             
     def test_load_creates_instance(self, mock_model_path):
         """Test that load() creates a Network instance."""

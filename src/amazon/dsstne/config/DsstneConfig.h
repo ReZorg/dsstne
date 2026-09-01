@@ -236,18 +236,6 @@ public:
     bool isValid() const { return validate().empty(); }
     
     /**
-     * @brief Get configuration value by path (e.g., "gpu.deviceId")
-     */
-    template<typename T>
-    T get(const std::string& path) const;
-    
-    /**
-     * @brief Set configuration value by path
-     */
-    template<typename T>
-    void set(const std::string& path, const T& value);
-    
-    /**
      * @brief Merge another configuration (other values take precedence)
      */
     void merge(const DsstneConfig& other);

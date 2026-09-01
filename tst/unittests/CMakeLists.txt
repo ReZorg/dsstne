@@ -29,6 +29,7 @@ find_package(PkgConfig)
 PKG_CHECK_MODULES(CPPUNIT REQUIRED cppunit)
 PKG_CHECK_MODULES(NETCDF REQUIRED netcdf)
 PKG_CHECK_MODULES(NETCDF_CXX4 REQUIRED netcdf-cxx4)
+PKG_CHECK_MODULES(JSONCPP REQUIRED jsoncpp)
 
 ################################################################################
 #
@@ -38,18 +39,22 @@ PKG_CHECK_MODULES(NETCDF_CXX4 REQUIRED netcdf-cxx4)
 
 set(ENGINE_DIR ../../src/amazon/dsstne/engine)
 set(UTILS_DIR ../../src/amazon/dsstne/utils)
+set(CONFIG_DIR ../../src/amazon/dsstne/config)
 
 include_directories(
     ${ENGINE_DIR}
     ${UTILS_DIR}
+    ${CONFIG_DIR}
     ${CPPUNIT_INCLUDE_DIR}
     ${NETCDF_INCLUDE_DIR}
     ${NETCDF_CXX4_INCLUDE_DIR}
+    ${JSONCPP_INCLUDE_DIRS}
 )
 
 set(UTILS_SOURCES
     ${UTILS_DIR}/NetCDFhelper.cpp
     ${UTILS_DIR}/Utils.cpp
+    ${CONFIG_DIR}/DsstneConfig.cpp
 )
 
 set(TEST_SOURCES
@@ -65,4 +70,5 @@ target_link_libraries(unittests
     ${CPPUNIT_LIBRARIES}
     ${NETCDF_LIBRARIES}
     ${NETCDF_CXX4_LIBRARIES}
+    ${JSONCPP_LIBRARIES}
 )

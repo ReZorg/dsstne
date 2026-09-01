@@ -20,10 +20,13 @@
 #include <limits>
 
 /*
- * TODO use the bitonic sorter from amazon/dsstne/engine/bitonic.h
- * The reason why we have two versions is that this version accounts
- * for row padding which is required to make rows a multiple of 4 or 8
- * to enable cublas to run the fp16 sgemm kernels on tensorcores.
+ * This kernel already reuses the bitonic sorter from amazon/dsstne/engine/bitonic.h
+ * (included above; see the BITONICSORT256_256()/SHFL() calls below).
+ * It intentionally keeps a separate, padding-aware variant of the engine's
+ * kCalculateTopK: this version accounts for row padding, which is required to make
+ * rows a multiple of 4 or 8 to enable cublas to run the fp16 sgemm kernels on
+ * tensorcores. The engine's kCalculateTopK kernels do not take a widthPadding
+ * parameter, so the two are not drop-in interchangeable.
  */
 
 static __global__ void
