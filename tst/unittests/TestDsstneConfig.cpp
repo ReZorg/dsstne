@@ -262,6 +262,21 @@ public:
         CPPUNIT_ASSERT_EQUAL(config.network.name, loaded.network.name);
     }
 
+    void TestYamlRoundTripTrailingBackslash()
+    {
+        // A value ending in a backslash exercises the escape boundary just
+        // before the closing quote.
+        DsstneConfig config;
+        config.training.checkpointPath = std::string("dir\\sub\\");
+
+        std::string path = writeTempFile("");
+        config.saveYaml(path);
+        DsstneConfig loaded = DsstneConfig::loadYaml(path);
+        std::remove(path.c_str());
+
+        CPPUNIT_ASSERT_EQUAL(config.training.checkpointPath, loaded.training.checkpointPath);
+    }
+
     void TestParseCommandLine()
     {
         const char* argv_arr[] = {
@@ -305,6 +320,7 @@ public:
     CPPUNIT_TEST(TestMerge);
     CPPUNIT_TEST(TestMergeDoesNotClobberCustomizations);
     CPPUNIT_TEST(TestYamlRoundTripWithQuotedSpecialChars);
+    CPPUNIT_TEST(TestYamlRoundTripTrailingBackslash);
     CPPUNIT_TEST(TestParseCommandLine);
     CPPUNIT_TEST(TestConfigVersion);
     CPPUNIT_TEST_SUITE_END();

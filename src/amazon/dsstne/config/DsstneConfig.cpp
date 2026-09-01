@@ -20,6 +20,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
+#include <cmath>
 
 #include <json/json.h>
 
@@ -179,10 +180,13 @@ std::string trim(const std::string& s) {
 // values emitted by yamlScalar round-trip correctly.
 std::string unquote(const std::string& s) {
     if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+        const size_t last = s.size() - 1;  // index of the closing quote
         std::string out;
         out.reserve(s.size() - 2);
-        for (size_t i = 1; i + 1 < s.size(); ++i) {
-            if (s[i] == '\\' && i + 2 < s.size() && (s[i + 1] == '"' || s[i + 1] == '\\')) {
+        for (size_t i = 1; i < last; ++i) {
+            // An escape is valid only when the escaped char is still inside the
+            // quoted body (strictly before the closing quote).
+            if (s[i] == '\\' && i + 1 < last && (s[i + 1] == '"' || s[i + 1] == '\\')) {
                 out += s[i + 1];
                 ++i;
             } else {
@@ -422,7 +426,15 @@ void DsstneConfig::merge(const DsstneConfig& other) {
     // only when it differs from the default-constructed value. This lets a
     // partially-specified `other` override just the fields it sets without
     // clobbering customizations in `*this` that `other` left at defaults.
+    //
+    // Floats are compared with a relative epsilon so that values surviving a
+    // serialization round-trip (which may differ by an ULP) are not mistaken
+    // for intentional overrides.
     const DsstneConfig dflt;  // defaults for comparison
+    const auto floatDiffers = [](float a, float b) {
+        const float scale = std::max(std::fabs(a), std::fabs(b));
+        return std::fabs(a - b) > 1e-6f * (scale > 1.0f ? scale : 1.0f);
+    };
 
     // version
     if (other.version.major != dflt.version.major) version.major = other.version.major;
@@ -431,18 +443,18 @@ void DsstneConfig::merge(const DsstneConfig& other) {
 
     // gpu
     if (other.gpu.deviceId != dflt.gpu.deviceId) gpu.deviceId = other.gpu.deviceId;
-    if (other.gpu.memoryFraction != dflt.gpu.memoryFraction) gpu.memoryFraction = other.gpu.memoryFraction;
+    if (floatDiffers(other.gpu.memoryFraction, dflt.gpu.memoryFraction)) gpu.memoryFraction = other.gpu.memoryFraction;
     if (other.gpu.allowGrowth != dflt.gpu.allowGrowth) gpu.allowGrowth = other.gpu.allowGrowth;
     if (other.gpu.vgpuMode != dflt.gpu.vgpuMode) gpu.vgpuMode = other.gpu.vgpuMode;
     if (other.gpu.maxConcurrentKernels != dflt.gpu.maxConcurrentKernels) gpu.maxConcurrentKernels = other.gpu.maxConcurrentKernels;
 
     // training
     if (other.training.optimizer != dflt.training.optimizer) training.optimizer = other.training.optimizer;
-    if (other.training.learningRate != dflt.training.learningRate) training.learningRate = other.training.learningRate;
-    if (other.training.momentum != dflt.training.momentum) training.momentum = other.training.momentum;
-    if (other.training.weightDecay != dflt.training.weightDecay) training.weightDecay = other.training.weightDecay;
-    if (other.training.l1Regularization != dflt.training.l1Regularization) training.l1Regularization = other.training.l1Regularization;
-    if (other.training.gradientClip != dflt.training.gradientClip) training.gradientClip = other.training.gradientClip;
+    if (floatDiffers(other.training.learningRate, dflt.training.learningRate)) training.learningRate = other.training.learningRate;
+    if (floatDiffers(other.training.momentum, dflt.training.momentum)) training.momentum = other.training.momentum;
+    if (floatDiffers(other.training.weightDecay, dflt.training.weightDecay)) training.weightDecay = other.training.weightDecay;
+    if (floatDiffers(other.training.l1Regularization, dflt.training.l1Regularization)) training.l1Regularization = other.training.l1Regularization;
+    if (floatDiffers(other.training.gradientClip, dflt.training.gradientClip)) training.gradientClip = other.training.gradientClip;
     if (other.training.shuffleIndices != dflt.training.shuffleIndices) training.shuffleIndices = other.training.shuffleIndices;
     if (other.training.checkpointInterval != dflt.training.checkpointInterval) training.checkpointInterval = other.training.checkpointInterval;
     if (other.training.checkpointPath != dflt.training.checkpointPath) training.checkpointPath = other.training.checkpointPath;
@@ -457,7 +469,7 @@ void DsstneConfig::merge(const DsstneConfig& other) {
 
     // inference
     if (other.inference.topK != dflt.inference.topK) inference.topK = other.inference.topK;
-    if (other.inference.threshold != dflt.inference.threshold) inference.threshold = other.inference.threshold;
+    if (floatDiffers(other.inference.threshold, dflt.inference.threshold)) inference.threshold = other.inference.threshold;
     if (other.inference.returnScores != dflt.inference.returnScores) inference.returnScores = other.inference.returnScores;
     if (other.inference.returnEmbeddings != dflt.inference.returnEmbeddings) inference.returnEmbeddings = other.inference.returnEmbeddings;
     if (other.inference.embeddingLayer != dflt.inference.embeddingLayer) inference.embeddingLayer = other.inference.embeddingLayer;

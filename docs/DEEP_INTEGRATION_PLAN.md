@@ -18,7 +18,7 @@
 | Parallelism detector | ✅ Done | `engine/ParallelismDetector.*` |
 | Embedding → KNN pipeline | ✅ Done | `pipeline/EmbeddingExtractor.*`, `NNKnnPipeline.*` |
 | Shared GPU utilities | ✅ Done | `common/GpuCommon.h` |
-| Unified configuration | ✅ Done | `config/DsstneConfig.{h,cpp}` — JSON/YAML load/save, env overrides, CLI parsing, merge, validation; covered by `TestDsstneConfig` (12 tests) |
+| Unified configuration | ✅ Done | `config/DsstneConfig.{h,cpp}` — JSON/YAML load/save, env overrides, CLI parsing, merge, validation; covered by `TestDsstneConfig` |
 | Centralized error / logging | ✅ Done | `common/DsstneError.h`, `common/Logger.h` |
 | GitHub Actions CI (CPU) | ✅ Done | `.github/workflows/ci.yml` (no GPU required) |
 | GPU/vGPU CI workflows | ✅ Done | `.github/workflows/gpu-tests.yml` (needs self-hosted GPU runner) |
