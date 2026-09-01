@@ -11,6 +11,7 @@
 #include "TestDataTypes.cpp"
 #include "TestCDLParser.cpp"
 #include "TestImportSamples.cpp"
+#include "TestDsstneConfig.cpp"
 
 //
 // In order to write a new test case, create a Test<File>.cpp and write the
@@ -35,5 +36,6 @@ int main()
     runner.addTest(TestConstants::suite());
     runner.addTest(TestCDLParser::suite());
     runner.addTest(TestImportSamples::suite());
+    runner.addTest(TestDsstneConfig::suite());
     return runner.run() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
