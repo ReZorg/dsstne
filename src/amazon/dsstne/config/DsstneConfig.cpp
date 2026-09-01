@@ -175,10 +175,21 @@ std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-// Remove surrounding double quotes if present.
+// Remove surrounding double quotes if present, unescaping \" and \\ so that
+// values emitted by yamlScalar round-trip correctly.
 std::string unquote(const std::string& s) {
     if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
-        return s.substr(1, s.size() - 2);
+        std::string out;
+        out.reserve(s.size() - 2);
+        for (size_t i = 1; i + 1 < s.size(); ++i) {
+            if (s[i] == '\\' && i + 2 < s.size() && (s[i + 1] == '"' || s[i + 1] == '\\')) {
+                out += s[i + 1];
+                ++i;
+            } else {
+                out += s[i];
+            }
+        }
+        return out;
     }
     return s;
 }
@@ -350,10 +361,13 @@ DsstneConfig DsstneConfig::loadYaml(const std::string& path) {
     std::string line;
     std::string section;
     while (std::getline(in, line)) {
-        // Strip comments (everything after an unquoted '#').
-        size_t hash = line.find('#');
-        if (hash != std::string::npos) {
-            line = line.substr(0, hash);
+        // Strip comments (everything after a '#' that is not inside a quoted
+        // string), so values like checkpointPath: "a/#b" are not truncated.
+        bool inQuotes = false;
+        for (size_t i = 0; i < line.size(); ++i) {
+            if (line[i] == '\\' && inQuotes) { ++i; continue; }  // skip escaped char
+            if (line[i] == '"') inQuotes = !inQuotes;
+            else if (line[i] == '#' && !inQuotes) { line = line.substr(0, i); break; }
         }
         if (trim(line).empty()) continue;
 
@@ -404,15 +418,61 @@ void DsstneConfig::parseCommandLine(int argc, char** argv) {
 //=============================================================================
 
 void DsstneConfig::merge(const DsstneConfig& other) {
-    // Scalar fields are copied wholesale. Sub-structs are replaced as units,
-    // matching the documented "other values take precedence" semantics.
-    version = other.version;
-    gpu = other.gpu;
-    training = other.training;
-    network = other.network;
-    inference = other.inference;
-    knn = other.knn;
-    logging = other.logging;
+    // Field-level precedence: for each field, the value from `other` is applied
+    // only when it differs from the default-constructed value. This lets a
+    // partially-specified `other` override just the fields it sets without
+    // clobbering customizations in `*this` that `other` left at defaults.
+    const DsstneConfig dflt;  // defaults for comparison
+
+    // version
+    if (other.version.major != dflt.version.major) version.major = other.version.major;
+    if (other.version.minor != dflt.version.minor) version.minor = other.version.minor;
+    if (other.version.patch != dflt.version.patch) version.patch = other.version.patch;
+
+    // gpu
+    if (other.gpu.deviceId != dflt.gpu.deviceId) gpu.deviceId = other.gpu.deviceId;
+    if (other.gpu.memoryFraction != dflt.gpu.memoryFraction) gpu.memoryFraction = other.gpu.memoryFraction;
+    if (other.gpu.allowGrowth != dflt.gpu.allowGrowth) gpu.allowGrowth = other.gpu.allowGrowth;
+    if (other.gpu.vgpuMode != dflt.gpu.vgpuMode) gpu.vgpuMode = other.gpu.vgpuMode;
+    if (other.gpu.maxConcurrentKernels != dflt.gpu.maxConcurrentKernels) gpu.maxConcurrentKernels = other.gpu.maxConcurrentKernels;
+
+    // training
+    if (other.training.optimizer != dflt.training.optimizer) training.optimizer = other.training.optimizer;
+    if (other.training.learningRate != dflt.training.learningRate) training.learningRate = other.training.learningRate;
+    if (other.training.momentum != dflt.training.momentum) training.momentum = other.training.momentum;
+    if (other.training.weightDecay != dflt.training.weightDecay) training.weightDecay = other.training.weightDecay;
+    if (other.training.l1Regularization != dflt.training.l1Regularization) training.l1Regularization = other.training.l1Regularization;
+    if (other.training.gradientClip != dflt.training.gradientClip) training.gradientClip = other.training.gradientClip;
+    if (other.training.shuffleIndices != dflt.training.shuffleIndices) training.shuffleIndices = other.training.shuffleIndices;
+    if (other.training.checkpointInterval != dflt.training.checkpointInterval) training.checkpointInterval = other.training.checkpointInterval;
+    if (other.training.checkpointPath != dflt.training.checkpointPath) training.checkpointPath = other.training.checkpointPath;
+
+    // network
+    if (other.network.name != dflt.network.name) network.name = other.network.name;
+    if (other.network.kind != dflt.network.kind) network.kind = other.network.kind;
+    if (other.network.errorFunction != dflt.network.errorFunction) network.errorFunction = other.network.errorFunction;
+    if (other.network.batchSize != dflt.network.batchSize) network.batchSize = other.network.batchSize;
+    if (other.network.dataPath != dflt.network.dataPath) network.dataPath = other.network.dataPath;
+    if (other.network.modelPath != dflt.network.modelPath) network.modelPath = other.network.modelPath;
+
+    // inference
+    if (other.inference.topK != dflt.inference.topK) inference.topK = other.inference.topK;
+    if (other.inference.threshold != dflt.inference.threshold) inference.threshold = other.inference.threshold;
+    if (other.inference.returnScores != dflt.inference.returnScores) inference.returnScores = other.inference.returnScores;
+    if (other.inference.returnEmbeddings != dflt.inference.returnEmbeddings) inference.returnEmbeddings = other.inference.returnEmbeddings;
+    if (other.inference.embeddingLayer != dflt.inference.embeddingLayer) inference.embeddingLayer = other.inference.embeddingLayer;
+
+    // knn
+    if (other.knn.k != dflt.knn.k) knn.k = other.knn.k;
+    if (other.knn.useGpu != dflt.knn.useGpu) knn.useGpu = other.knn.useGpu;
+    if (other.knn.batchSize != dflt.knn.batchSize) knn.batchSize = other.knn.batchSize;
+    if (other.knn.metric != dflt.knn.metric) knn.metric = other.knn.metric;
+
+    // logging
+    if (other.logging.level != dflt.logging.level) logging.level = other.logging.level;
+    if (other.logging.file != dflt.logging.file) logging.file = other.logging.file;
+    if (other.logging.console != dflt.logging.console) logging.console = other.logging.console;
+    if (other.logging.timestamps != dflt.logging.timestamps) logging.timestamps = other.logging.timestamps;
 }
 
 } // namespace dsstne

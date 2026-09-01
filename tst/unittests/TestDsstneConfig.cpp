@@ -228,6 +228,40 @@ public:
         CPPUNIT_ASSERT_EQUAL(5, base.gpu.deviceId);
     }
 
+    void TestMergeDoesNotClobberCustomizations()
+    {
+        // Base is customized away from defaults.
+        DsstneConfig base;
+        base.network.batchSize = 16;
+        base.training.optimizer = "rmsprop";
+        base.knn.k = 99;
+
+        // Merge a default-constructed config: nothing should change because
+        // `other` set no field away from its default.
+        DsstneConfig defaults;
+        base.merge(defaults);
+
+        CPPUNIT_ASSERT_EQUAL((uint32_t)16, base.network.batchSize);
+        CPPUNIT_ASSERT_EQUAL(std::string("rmsprop"), base.training.optimizer);
+        CPPUNIT_ASSERT_EQUAL((uint32_t)99, base.knn.k);
+    }
+
+    void TestYamlRoundTripWithQuotedSpecialChars()
+    {
+        DsstneConfig config;
+        // Contains a '#', a quote, and a backslash — exercises quoting/escaping.
+        config.training.checkpointPath = "check/dir#1/\"quoted\"\\back";
+        config.network.name = "net:with:colons";
+
+        std::string path = writeTempFile("");
+        config.saveYaml(path);
+        DsstneConfig loaded = DsstneConfig::loadYaml(path);
+        std::remove(path.c_str());
+
+        CPPUNIT_ASSERT_EQUAL(config.training.checkpointPath, loaded.training.checkpointPath);
+        CPPUNIT_ASSERT_EQUAL(config.network.name, loaded.network.name);
+    }
+
     void TestParseCommandLine()
     {
         const char* argv_arr[] = {
@@ -269,6 +303,8 @@ public:
     CPPUNIT_TEST(TestYamlRoundTrip);
     CPPUNIT_TEST(TestLoadYamlThrowsOnMissingFile);
     CPPUNIT_TEST(TestMerge);
+    CPPUNIT_TEST(TestMergeDoesNotClobberCustomizations);
+    CPPUNIT_TEST(TestYamlRoundTripWithQuotedSpecialChars);
     CPPUNIT_TEST(TestParseCommandLine);
     CPPUNIT_TEST(TestConfigVersion);
     CPPUNIT_TEST_SUITE_END();

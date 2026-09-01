@@ -2,9 +2,9 @@
 
 > **Status Update (see "Implementation Status" below):** The majority of the
 > features described in this plan and in issue #16 have been implemented and are
-> covered by the CPU unit-test suite (138 tests) and the Python test suite
-> (27 tests). A small number of items that require GPU / multi-GPU hardware to
-> implement and validate remain open.
+> covered by the C++ CPU unit-test suite and the Python test suite. A small
+> number of items that require GPU / multi-GPU hardware to implement and
+> validate remain open.
 
 ## Implementation Status
 
